@@ -34,15 +34,15 @@ private:
 
     paolMat *cam;
     paolMat *old;
-    paolMat *modCam;
     paolMat *background;
     paolMat *backgroundRefined;
-    paolMat *camClean;
+    paolMat *oldBackgroundRefined;
     paolMat *rawEnhanced;
 
     float numDif;
     float refinedNumDif;
     int count;
+    float saveNumDif;
 
     bool runCam;
     bool runData;

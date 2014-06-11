@@ -26,10 +26,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     cam=new paolMat();
     old=new paolMat();
-    modCam=new paolMat();
     background=new paolMat();
-    camClean=new paolMat();
     backgroundRefined=new paolMat();
+    oldBackgroundRefined=new paolMat();
     rawEnhanced=new paolMat();
 
     count=0;
@@ -45,76 +44,92 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::processWhiteboard(){
+    //take picture
     //cam->displayImage(*ui->imDisplay1);
 
+    //compare picture to previous picture and store differences in old->maskMin
     numDif=old->differenceMin(cam,40,1);
     qDebug(" numDif=%f\n",numDif);
 
+    //if there is enough of a difference between the two images
     if(numDif>.03){
+        //set up a new % that represents difference
         refinedNumDif=old->shrinkMaskMin();
         count=0;
-        //old->displayMaskMin(*ui->imDisplay2);
     } else {
         refinedNumDif=0;
     }
 
+    //if the images are really identical, count the number of consecultive nearly identical images
     if (numDif < .000001)
         count++;
 
     qDebug(" refinedNumDif=%f  numDif=%f\n",refinedNumDif,numDif);
 
+    //if the differences are enough that we know where the lecturer is or the images have been identical
+    //for two frames, and hence no lecturer present
     if(refinedNumDif>.04 || (numDif <.000001 && count==2)){
+        //copy the input image and process it to highlight the text
         rawEnhanced->copy(cam);
         rawEnhanced->averageWhiteboard(20);
         rawEnhanced->enhanceText();
         //rawEnhanced->displayImage(*ui->imDisplay8);
 
+        /////////////////////////////////////////////////////////////
+        //identify where motion is
+
+        //extend the area of differences and sweep differences for more solid area
         old->extendMaskMinToEdges();
         old->sweepDownMin();
-        //old->displayMaskMin(*ui->imDisplay3);
-
+        //keep only the solid area and grow that region
         old->keepWhiteMaskMin();
         old->growMin(8);
-        //old->displayMaskMin(*ui->imDisplay4);
-
+        //draw a convex hull around area of differences
         old->findContoursMaskMin();
-        //old->displayMaskMin(*ui->imDisplay5);
-
+        //fill in area surrounded by convex hull
         old->sweepDownMin();
         old->keepWhiteMaskMin();
-        //old->displayMaskMin(*ui->imDisplay6);
+        ///////////////////////////////////////////////////////////////////////
 
-        modCam->copy(cam);
-        modCam->copyMaskMin(old);
-        modCam->maskMinToMaskBinary();
-        //modCam->displayMaskMin(*ui->imDisplay6);
+        //process to identify text location
 
+        //smooth image
         cam->blur(1);
+        //find edge information and store total edge information in 0 (blue) color channel of mask
         cam->pDrift();
-        //cam->displayMask(*ui->imDisplay7);
-
+        //grow the area around where the edges are found (if edge in channel 0 grow in channel 2)
         cam->grow(15,3);
-        //cam->displayMask(*ui->imDisplay9);
+        ////////////////////////////////////////////////////////////////////////////////
 
-        camClean->copy(cam);
-        //camClean->nontextToWhite();
-        //camClean->displayImage(*ui->imDisplay8);
+        //process to update background image
 
-        camClean->copyMaskMin(old);
-        //camClean->displayMask(*ui->imDisplay9);
-        //camClean->displayMaskMin(*ui->imDisplay10);
-        camClean->maskMinToMaskBinary();
+        //copy movement information into rawEnhanced and then expand to full mask
+        rawEnhanced->copyMaskMin(old);
+        rawEnhanced->maskMinToMaskBinary();
 
-        background->updateBackgroundMaskMin(camClean,rawEnhanced);
-        background->updateBack2(camClean,cam,rawEnhanced);
-        //background->displayMask(*ui->imDisplay10);
-        //background->displayImage(*ui->imDisplay11);
+        //update the background image with new information
+        background->updateBack2(rawEnhanced,cam);
 
+        //copy the background image to one for processing
         backgroundRefined->copy(background);
-        backgroundRefined->testMethod();
+        //darken text and set whiteboard to white
+        backgroundRefined->darkenText();
+        //copy text location information into mask
+        backgroundRefined->copyMask(background);
         backgroundRefined->displayImage(*ui->imDisplay10);
-        //backgroundRefined->processText(background);
-        //backgroundRefined->displayImage(*ui->imDisplay12);
+        //////////////////////////////////////////////////
+
+        //figure out if saves need to be made
+
+        //count the number of differences in the refined text area between refined images
+        saveNumDif = oldBackgroundRefined->countDifsMask(backgroundRefined);
+        qDebug("save dif=%f",saveNumDif);
+        //NOTE: once the image has been cut down to just white board saveNumDif should be a way
+        //of determining what to save, write now crap from wall background causes it to be useless
+
+        //oldBackgroundRefined->displayMask(*ui->imDisplay12);
+        //copy last clean whiteboard image
+        oldBackgroundRefined->copy(backgroundRefined);
     }
 }
 
@@ -147,7 +162,8 @@ void MainWindow::on_camera_clicked()
     cam->setCameraNum(1);
     cam->takePicture();
     background->copy(cam);
-    backgroundRefined->copy(cam);
+    backgroundRefined->copyClean(cam);
+    oldBackgroundRefined->copyClean(cam);
     runCam=true;
     pause=false;
 }
@@ -163,7 +179,8 @@ void MainWindow::on_loadDataSet_clicked()
 
     cam->readNext(this);
     background->copy(cam);
-    backgroundRefined->copy(cam);
+    backgroundRefined->copyClean(cam);
+    oldBackgroundRefined->copyClean(cam);
     runData=true;
     pause=false;
 }

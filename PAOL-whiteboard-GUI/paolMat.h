@@ -56,6 +56,8 @@ public:
     ~paolMat();
     paolMat(paolMat* m);
     void copy(paolMat* m);
+    void copyClean(paolMat* m);
+    void copyMask(paolMat* m);
     void copyMaskMin(paolMat* m);
 
     void setCameraNum(int i);
@@ -87,12 +89,12 @@ public:
     void grow(int blueThresh, int size);
     void nontextToWhite();
     void updateBackgroundMaskMin(paolMat *m, paolMat *foreground);
-    void updateBack2(paolMat *m, paolMat *n,paolMat *foreground);
+    void updateBack2(paolMat *foreground, paolMat *edgeInfo);
     void processText(paolMat *m);
-    void testMethod();
+    void darkenText();
     void averageWhiteboard(int size);
     void enhanceText();
-    float countDifsMask(paolMat *m);
+    float countDifsMask(paolMat *newIm);
 };
 
 #endif // PAOLMAT_H

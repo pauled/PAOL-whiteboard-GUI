@@ -40,7 +40,7 @@ paolMat::~paolMat()
 }
 
 void paolMat::copy(paolMat *m){
-    //clear out existing images
+    //clear out existing images and copy in new
     if(src.data)
         src.~Mat();
     if(mask.data)
@@ -63,12 +63,43 @@ void paolMat::copy(paolMat *m){
     scale=m->scale;
 }
 
+void paolMat::copyClean(paolMat *m){
+    //clear out existing images and make blank
+    if(src.data)
+        src.~Mat();
+    if(mask.data)
+        mask.~Mat();
+    if(maskMin.data)
+        maskMin.~Mat();
+
+    if(m->src.data){
+        src = Mat::zeros(m->src.size(),m->src.type());
+        mask = Mat::zeros(m->src.size(),m->src.type());
+        maskMin = Mat::zeros(m->src.size(),m->src.type());
+    }
+
+    cameraNum=m->cameraNum;
+    sprintf(readName,"%s",m->readName);
+    countRead=m->countRead;
+    time=m->time;
+    dirOut=m->dirOut;
+    scale=m->scale;
+}
+
 void paolMat::copyMaskMin(paolMat *m){
     if(maskMin.data)
         maskMin.~Mat();
 
     if(m->maskMin.data)
         maskMin = m->maskMin.clone();
+}
+
+void paolMat::copyMask(paolMat *m){
+    if(mask.data)
+        mask.~Mat();
+
+    if(m->mask.data)
+        mask = m->mask.clone();
 }
 
 void paolMat::setCameraNum(int i){
@@ -588,28 +619,23 @@ void paolMat::blur(int size)
 void paolMat::pDrift()
 {
     int temp,total;
+    //clean mask
     if (mask.data){
         mask.~Mat();
     }
     mask=Mat::zeros(src.size(),src.type());
 
-    qDebug("rows=%d cols=%d",mask.rows,mask.cols);
+    //for every pixel in image (excludeing edges where perocess would break
     for(int y = 0; y < src.rows -1; y++)
         for(int x = 0; x < src.cols -1; x++)
         {
             //look for edges in the vertical direction using a variation on a Sobel filter
-            //[0 1 -1]
-
-            //skipped and [-1 1 0]. The zero column is dropped in each case
+            //[1 -1]
             temp = (
                         //y,x+1
                         abs(src.at<Vec3b>(y,x)[0] - src.at<Vec3b>(y,x+1)[0])+
                     abs(src.at<Vec3b>(y,x)[1] - src.at<Vec3b>(y,x+1)[1])+
-                    abs(src.at<Vec3b>(y,x)[2] - src.at<Vec3b>(y,x+1)[2])/*+
-                    //y,x-1
-                    abs(src.at<Vec3b>(y,x)[0] - src.at<Vec3b>(y,x-1)[0])+
-                    abs(src.at<Vec3b>(y,x)[1] - src.at<Vec3b>(y,x-1)[1])+
-                    abs(src.at<Vec3b>(y,x)[2] - src.at<Vec3b>(y,x-1)[2])*/
+                    abs(src.at<Vec3b>(y,x)[2] - src.at<Vec3b>(y,x+1)[2])
                     );
 
             if(temp > 255)
@@ -624,11 +650,7 @@ void paolMat::pDrift()
                         //y+1,x
                         abs(src.at<Vec3b>(y,x)[0] - src.at<Vec3b>(y+1,x)[0])+
                     abs(src.at<Vec3b>(y,x)[1] - src.at<Vec3b>(y+1,x)[1])+
-                    abs(src.at<Vec3b>(y,x)[2] - src.at<Vec3b>(y+1,x)[2])/*+
-                    //y-1,
-                    abs(src.at<Vec3b>(y,x)[0] - src.at<Vec3b>(y-1,x)[0])+
-                    abs(src.at<Vec3b>(y,x)[1] - src.at<Vec3b>(y-1,x)[1])+
-                    abs(src.at<Vec3b>(y,x)[2] - src.at<Vec3b>(y-1,x)[2])*/
+                    abs(src.at<Vec3b>(y,x)[2] - src.at<Vec3b>(y+1,x)[2])
                     );
             if(temp > 255)
                 temp = 255;
@@ -637,36 +659,30 @@ void paolMat::pDrift()
                 total = 255;
 
             //write the horizontal edge information to the green color channel
-            mask.at<Vec3b>(y,x)[1] = total;
+            mask.at<Vec3b>(y,x)[1] = temp;
             //write the addition of the horizontal and vertical edges found to the blue color channel
             mask.at<Vec3b>(y,x)[0] = total;
         }
 }
 
-
+//grow the areas highlighted in the 0 color channel of the mask
+// //translation-if the difference in blue is enough then turn on the surrounding red pixel
 void paolMat::grow(int blueThresh, int size)
 {
-    /*int temp;
-    for(int y = size; y < src.rows - size; y++)
-        for(int x = size ; x < src.cols - size; x++){
-            temp=mask.at<Vec3b>(y,x)[0];
-            temp+=mask.at<Vec3b>(y,x)[1];
-            temp+=mask.at<Vec3b>(y,x)[2];
-            if (temp>255)
-                temp=255;
-            mask.at<Vec3b>(y,x)[0]=temp;//mask.at<Vec3b>(y,x)[2];//copy red to blue added 4/23/14
-        }*/
+    //for every pixel
     for(int y = size; y < src.rows - size; y++)
         for(int x = size ; x < src.cols - size; x++)
-            if(mask.at<Vec3b>(y,x)[0] > blueThresh)
+            //if the value in the mask is greater then a theshold
+            if(mask.at<Vec3b>(y,x)[0] > blueThresh){
+                //brighten edge
+                mask.at<Vec3b>(y,x)[0]=255;
+                //turn all the pixels in the square of size 2*size+1 around it on in the 2 color channel
                 for(int yy = y-size; yy <= y+size;yy++)
                     for(int xx = x-size; xx <= x+size; xx++)
                         mask.at<Vec3b>(yy,xx)[2] = 255;
-
-    /*for(int y = 0; y < src.rows; y++)
-        for(int x = 0; x < src.cols; x++)
-            mask.at<Vec3b>(y,x)[0] = mask.at<Vec3b>(y,x)[2];
-*/
+            } else {
+                mask.at<Vec3b>(y,x)[0]=0;
+            }
 }
 
 void paolMat::nontextToWhite()
@@ -680,7 +696,7 @@ void paolMat::nontextToWhite()
                 src.at<Vec3b>(y,x)[2] = 255;
             }
         }
-    //blank the first row because it had bad information for whatever reason
+    //blank the first row because it had bad information
     for(y = 0; y < mask.rows; y++){
         x=0;
         src.at<Vec3b>(y,x)[0] = 255;
@@ -764,18 +780,27 @@ void paolMat::updateBackgroundMaskMin(paolMat *m, paolMat *foreground){
     }
     qDebug("count=%d",count);
 }
-void paolMat::updateBack2(paolMat *m,paolMat *n,paolMat *foreground){
-    if(!mask.data)
-        mask=n->mask.clone();
 
+//this method updates the whiteboard image, removing the professor
+//the foreground image contains the foreground information in src and the
+//  information on movement in its mask
+//the edgeInfo image contains the current mask data related to edges
+void paolMat::updateBack2(paolMat *foreground,paolMat *edgeInfo){
+    //if no mask exists (the first time) create a blank mask
+    if(!mask.data)
+        mask=Mat::zeros(src.size(),src.type());
+
+    //for every pixel in the image
     for (int y = 0; y < src.rows; y++)
     {
         for (int x = 0; x < src.cols; x++)
         {
-            if (m->mask.at<Vec3b>(y,x)[0]==0){
+            //if there was no movement at that pixel
+            if (foreground->mask.at<Vec3b>(y,x)[0]==0){
+                //update what the whiteboard and edge information look like at that pixel
                 for (int c=0;c<3;c++){
                     src.at<Vec3b>(y,x)[c]=foreground->src.at<Vec3b>(y,x)[c];
-                    mask.at<Vec3b>(y,x)[c]=n->mask.at<Vec3b>(y,x)[c];
+                    mask.at<Vec3b>(y,x)[c]=edgeInfo->mask.at<Vec3b>(y,x)[c];
                 }
             }
         }
@@ -857,19 +882,23 @@ void paolMat::processText(paolMat *m){
             }
 }
 
-void paolMat::testMethod(){
+//method for darkening text and setting whiteboard to white
+void paolMat::darkenText(){
     //int temp;
     Mat tempOut;
 
+    //for every pixel
     for(int y = 0; y < src.rows; y++)
         for(int x = 0; x < src.cols; x++){
-            //temp=mask.at<Vec3b>(y,x)[1];
-            mask.at<Vec3b>(y,x)[0]=mask.at<Vec3b>(y,x)[1];
+            //write edge information from blue into green channel and zero out red
+            mask.at<Vec3b>(y,x)[1]=mask.at<Vec3b>(y,x)[0];
             if (mask.at<Vec3b>(y,x)[1]>15)
                 mask.at<Vec3b>(y,x)[1]=255;
             mask.at<Vec3b>(y,x)[2]=0;
         }
 
+    //run a morphological closure (grow then shrink)
+    //this will fill in spaces in text caused by only looking at edges
     int dilation_type = MORPH_RECT;
     int dilation_size = 1;
     Mat element = getStructuringElement( dilation_type,
@@ -879,6 +908,7 @@ void paolMat::testMethod(){
     dilate(mask, tempOut, element);
     erode(tempOut, tempOut, element);
 
+    //for every pixel
     for(int y = 0; y < src.rows; y++)
         for(int x = 0; x < src.cols; x++){
             //code to make it look pretty on the mask
@@ -886,6 +916,7 @@ void paolMat::testMethod(){
                 mask.at<Vec3b>(y,x)[2]=255;
             }
 
+            //if there isn't and edge (text) in that location turn the pixel white
             if (tempOut.at<Vec3b>(y,x)[1]<50){
                 src.at<Vec3b>(y,x)[0]=255;
                 src.at<Vec3b>(y,x)[1]=255;
@@ -894,21 +925,27 @@ void paolMat::testMethod(){
         }
 }
 
+//method to determine group truth of what it whiteboard in the image
+//averages the brightest 25% of pixels in each square of size size
 void paolMat::averageWhiteboard(int size){
     int x,y,xx,yy;
     int count,color,thresh;
     vector <int> pix;
     vector <int> ave;
 
+    //clear the mask and create a new one
     if(mask.data)
         mask.~Mat();
     mask=Mat::zeros(src.size(),src.type());
 
+    //go through the image by squares of radius size
     for (x=0;x<src.cols;x+=size)
         for (y=0;y<src.rows;y+=size){
             pix.clear();
             ave.clear();
 
+            //within each square create a vector pix that hold all brightness values
+            //for the pixels
             for(xx=x; xx<x+size && xx<src.cols; xx++)
                 for (yy=y; yy<y+size && yy<src.rows; yy++){
                     color=0;
@@ -918,13 +955,18 @@ void paolMat::averageWhiteboard(int size){
                     pix.push_back(color);
                 }
 
+            //clear the average pixel values
             for (int c=0;c<3;c++)
                 ave.push_back(0);
 
+            //sort the vector of brightness pixels (low to high)
             sort(pix.begin(),pix.end());
+            //figure out what the brightness theshold is for the brightest 25%
             thresh=pix[pix.size()*3/4];
             count=0;
 
+            //for all the pixels in the square add the color components to the averge vector
+            //if the brightness is over the theshold
             for(xx=x; xx<x+size && xx<src.cols; xx++)
                 for (yy=y; yy<y+size && yy<src.rows; yy++){
                     color=0;
@@ -938,10 +980,11 @@ void paolMat::averageWhiteboard(int size){
                             ave[c]+=src.at<Vec3b>(yy,xx)[c];
                     }
                 }
-
+            //figure out the average brightness of each channel for the brightest pixels
             for (int c=0;c<3;c++)
                 ave[c]/=count;
 
+            //set the pixels in the mask to the average brightness of the image, square by square
             for(xx=x; xx<x+size && xx<src.cols; xx++)
                 for (yy=y; yy<y+size && yy<src.rows; yy++){
                     for (int c=0;c<3;c++)
@@ -950,19 +993,29 @@ void paolMat::averageWhiteboard(int size){
         }
 }
 
+//Use the average image to turn the whiteboard of the image white and to darken the text
 void paolMat::enhanceText(){
     int dif;
 
+    //for every pixel in the image and for every color channel
     for(int x = 0; x < src.cols; x++)
         for(int y = 0; y < src.rows; y++){
             for(int c=0;c<3;c++){
+
+                //if the pixel is not 0 (just put in so that we don't divide by 0)
                 if (mask.at<Vec3b>(y,x)[c]>0){
+                    //take the brightness of the pixel and divide it by what white is in
+                    //that location (average from mask)
                     dif=255*src.at<Vec3b>(y,x)[c]/mask.at<Vec3b>(y,x)[c];
+                    //if it's brighter then white turn it white
                     if (dif>255)
                         dif=255;
                 } else {
+                    //if the average pixel color is 0 turn it white
                     dif=255;
                 }
+
+                //double the distance each color is from white to make text darker
                 dif=255-(255-dif)*2;
                 if (dif<0)
                     dif=0;
@@ -971,6 +1024,27 @@ void paolMat::enhanceText(){
         }
 }
 
-float paolMat::countDifsMask(paolMat *m){
+//gives the percentage of differences in text in the image
+// it does this by counting the number of times text (0-blue color channel)
+// is the not the same between images and where it appears in one image is not in an area surrounding text
+// in the other
+float paolMat::countDifsMask(paolMat *newIm){
+    int difs=0;
 
+    for(int x = 0; x < src.cols; x++)
+        for(int y = 0; y < src.rows; y++){
+            if((mask.at<Vec3b>(y,x)[0]!=0 and newIm->mask.at<Vec3b>(y,x)[2]!=255) ||
+                (newIm->mask.at<Vec3b>(y,x)[0]!=0 and mask.at<Vec3b>(y,x)[2]!=255)){
+                difs++;
+                mask.at<Vec3b>(y,x)[0]=255;
+                mask.at<Vec3b>(y,x)[1]=255;
+                mask.at<Vec3b>(y,x)[2]=255;
+            } else {
+                mask.at<Vec3b>(y,x)[0]=0;
+                mask.at<Vec3b>(y,x)[1]=0;
+                mask.at<Vec3b>(y,x)[2]=0;
+            }
+        }
+
+    return (double)difs/((double)(mask.cols*mask.rows));
 }
