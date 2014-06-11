@@ -13,8 +13,12 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp\
-        mainwindow.cpp
+        mainwindow.cpp \
+    paolMat.cpp
 
-HEADERS  += mainwindow.h
+HEADERS  += mainwindow.h \
+    paolMat.h
 
 FORMS    += mainwindow.ui
+
+LIBS += `pkg-config opencv --libs`

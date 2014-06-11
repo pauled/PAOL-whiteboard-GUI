@@ -173,7 +173,7 @@ qDebug("2");
                 con1->findContoursMaskMin();
                 qDebug("6");
                 //con1->contoursToMask();
-                /*con1->sweepDownMin();
+                con1->sweepDownMin();
                 qDebug("7");
                 con1->keepWhiteMin();
                 qDebug("higher");
@@ -188,11 +188,11 @@ qDebug("2");
                 qDebug("10");
                 con2->displayImage(*ui->imDisplay9);
                 qDebug("middle");
-*/
+
                 cam->blur(1);
                 cam->pDrift();
 
-    /*            cam->displayMask(*ui->imDisplay1);
+                cam->displayMask(*ui->imDisplay1);
 
                 cam->grow(30,3);
                 cam->displayImage(*ui->imDisplay3);
@@ -206,7 +206,7 @@ qDebug("2");
                 background2->displayImage(*ui->imDisplay5);
                 //background->displayMaskMin(*ui->imDisplay5);
                 back2->updateBack2(con2);
-                qDebug("end");*/
+                qDebug("end");
         }
 //        back2->displayImage(*ui->imDisplay6);
         //con1->maskToRed();
