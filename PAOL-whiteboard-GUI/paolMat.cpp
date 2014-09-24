@@ -778,7 +778,7 @@ void paolMat::updateBackgroundMaskMin(paolMat *m, paolMat *foreground){
             }
         }
     }
-    qDebug("count=%d",count);
+    //qDebug("count=%d",count);
 }
 
 //this method updates the whiteboard image, removing the professor
@@ -1030,9 +1030,11 @@ void paolMat::enhanceText(){
 // in the other
 float paolMat::countDifsMask(paolMat *newIm){
     int difs=0;
+    int sizeBuffer=40;//area around edge of whiteboard that is ignored when looking for difference
+    //there is often a lot of noise at the edges
 
-    for(int x = 0; x < src.cols; x++)
-        for(int y = 0; y < src.rows; y++){
+    for(int x = sizeBuffer; x < src.cols-sizeBuffer; x++)
+        for(int y = sizeBuffer; y < src.rows-sizeBuffer; y++){
             if((mask.at<Vec3b>(y,x)[0]!=0 and newIm->mask.at<Vec3b>(y,x)[2]!=255) ||
                 (newIm->mask.at<Vec3b>(y,x)[0]!=0 and mask.at<Vec3b>(y,x)[2]!=255)){
                 difs++;
@@ -1044,7 +1046,96 @@ float paolMat::countDifsMask(paolMat *newIm){
                 mask.at<Vec3b>(y,x)[1]=0;
                 mask.at<Vec3b>(y,x)[2]=0;
             }
+            //src.at<Vec3b>(y,x)[2]=255;
         }
 
     return (double)difs/((double)(mask.cols*mask.rows));
+}
+
+void paolMat::rectifyImage(paolMat *m){
+    double widthP,heightP;
+    double LTx,LTy,LBx,LBy,RTx,RTy,RBx,RBy;//L left R right T top B bottom
+    LTx=547;
+    LTy=290;
+    LBx=527;
+    LBy=932;
+    RTx=1831;
+    RTy=222;
+    RBx=1914;
+    RBy=904;
+    int xInput,yInput;
+    double LPx,LPy,RPx,RPy;//end points of line between edges on which point is found
+    /*int rows,cols;
+    if (RTx-LTx>RBx-LBx)
+        cols=RTx-LTx;
+    else
+        cols=RBx-LBx;
+    if (RBy-RTy>LBy-LTy)
+        rows=RBy-RTy;
+    else
+        rows=LBy-LTy;
+*/
+    if(src.data)
+        src.~Mat();
+    //src=Mat::zeros(rows,cols,m->src.type());
+    src=Mat::zeros(m->src.size(),m->src.type());
+
+    for(int x = 0; x < src.cols; x++)
+        for(int y = 0; y < src.rows; y++){
+            widthP=(double)x/(double)src.cols;
+            heightP=(double)y/(double)src.rows;
+            LPx=LTx+(LBx-LTx)*heightP;
+            LPy=LTy+(LBy-LTy)*heightP;
+            RPx=RTx+(RBx-RTx)*heightP;
+            RPy=RTy+(RBy-RTy)*heightP;
+
+            xInput=(int)(LPx+(RPx-LPx)*widthP);
+            yInput=(int)(LPy+(RPy-LPy)*widthP);
+
+            if (xInput>=0 &&
+                    xInput<m->src.cols &&
+                    yInput>=0 &&
+                    yInput<m->src.rows){
+                src.at<Vec3b>(y,x)[0]=m->src.at<Vec3b>(yInput,xInput)[0];
+                src.at<Vec3b>(y,x)[1]=m->src.at<Vec3b>(yInput,xInput)[1];
+                src.at<Vec3b>(y,x)[2]=m->src.at<Vec3b>(yInput,xInput)[2];
+            } else {
+                src.at<Vec3b>(y,x)[0]=0;
+                src.at<Vec3b>(y,x)[1]=0;
+                src.at<Vec3b>(y,x)[2]=0;
+            }
+        }
+}
+
+void paolMat::findBoard(paolMat *m){
+    Canny(m->src, mask, 50, 200, 3);
+    cvtColor(mask, src, CV_GRAY2BGR);
+
+    /*vector<Vec4i> lines;
+    HoughLinesP( mask, lines, 1, CV_PI/180, 80, 30, 10 );
+    for( size_t i = 0; i < lines.size(); i++ )
+    {
+        line( src, Point(lines[i][0], lines[i][1]),
+                Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 3, 8 );
+    }*/
+
+
+    vector<Vec2f> lines;
+    // detect lines
+    HoughLines(mask, lines, 1, CV_PI/180, 250, 0, 0 );
+    src.~Mat();
+    src=m->src.clone();
+    // draw lines
+    for( size_t i = 0; i < lines.size(); i++ )
+    {
+        float rho = lines[i][0], theta = lines[i][1];
+        Point pt1, pt2;
+        double a = cos(theta), b = sin(theta);
+        double x0 = a*rho, y0 = b*rho;
+        pt1.x = cvRound(x0 + 2000*(-b));
+        pt1.y = cvRound(y0 + 2000*(a));
+        pt2.x = cvRound(x0 - 2000*(-b));
+        pt2.y = cvRound(y0 - 2000*(a));
+        line( src, pt1, pt2, Scalar(0,0,255), 3, CV_AA);
+    }
 }

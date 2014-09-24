@@ -95,6 +95,9 @@ public:
     void averageWhiteboard(int size);
     void enhanceText();
     float countDifsMask(paolMat *newIm);
+
+    void rectifyImage(paolMat *m);
+    void findBoard(paolMat *m);
 };
 
 #endif // PAOLMAT_H

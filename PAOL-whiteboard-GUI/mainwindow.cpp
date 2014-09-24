@@ -30,6 +30,7 @@ MainWindow::MainWindow(QWidget *parent) :
     backgroundRefined=new paolMat();
     oldBackgroundRefined=new paolMat();
     rawEnhanced=new paolMat();
+    rectified=new paolMat();
 
     count=0;
 
@@ -45,11 +46,11 @@ MainWindow::~MainWindow()
 
 void MainWindow::processWhiteboard(){
     //take picture
-    //cam->displayImage(*ui->imDisplay1);
+    cam->displayImage(*ui->imDisplay1);
 
     //compare picture to previous picture and store differences in old->maskMin
     numDif=old->differenceMin(cam,40,1);
-    qDebug(" numDif=%f\n",numDif);
+//qDebug(" numDif=%f\n",numDif);
 
     //if there is enough of a difference between the two images
     if(numDif>.03){
@@ -64,7 +65,7 @@ void MainWindow::processWhiteboard(){
     if (numDif < .000001)
         count++;
 
-    qDebug(" refinedNumDif=%f  numDif=%f\n",refinedNumDif,numDif);
+//qDebug(" refinedNumDif=%f  numDif=%f\n",refinedNumDif,numDif);
 
     //if the differences are enough that we know where the lecturer is or the images have been identical
     //for two frames, and hence no lecturer present
@@ -116,7 +117,9 @@ void MainWindow::processWhiteboard(){
         backgroundRefined->darkenText();
         //copy text location information into mask
         backgroundRefined->copyMask(background);
-        backgroundRefined->displayImage(*ui->imDisplay10);
+        //backgroundRefined->displayImage(*ui->imDisplay10);
+        rectified->rectifyImage(backgroundRefined);
+        rectified->displayImage(*ui->imDisplay10);
         //////////////////////////////////////////////////
 
         //figure out if saves need to be made
@@ -133,6 +136,16 @@ void MainWindow::processWhiteboard(){
     }
 }
 
+void MainWindow::rectifyImage(){
+    rectified->rectifyImage(cam);
+    rectified->displayImage(*ui->imDisplay1);
+}
+
+void MainWindow::findLines(){
+    old->findBoard(cam);
+    old->displayImage(*ui->imDisplay1);
+}
+
 void MainWindow::displayFrame() {
     if(!pause && (runCam || runData)){
 
@@ -145,8 +158,12 @@ void MainWindow::displayFrame() {
             if(!cam->readNext(this))
                 runData=false;
         }
+        //rectified->copy(cam);
+        //cam->rectifyImage(rectified);
 
         processWhiteboard();
+        //rectifyImage();
+        //findLines();
     }
 }
 

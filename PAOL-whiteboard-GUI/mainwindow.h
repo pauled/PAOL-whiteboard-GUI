@@ -17,6 +17,8 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
     void processWhiteboard();
+    void rectifyImage();
+    void findLines();
 
 private slots:
     void displayFrame();
@@ -38,6 +40,7 @@ private:
     paolMat *backgroundRefined;
     paolMat *oldBackgroundRefined;
     paolMat *rawEnhanced;
+    paolMat *rectified;
 
     float numDif;
     float refinedNumDif;
