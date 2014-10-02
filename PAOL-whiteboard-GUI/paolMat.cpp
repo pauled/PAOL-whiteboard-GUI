@@ -1024,6 +1024,18 @@ void paolMat::enhanceText(){
         }
 }
 
+// Get the edges produced by the difference of Gaussians
+void paolMat::dogEdges(int rad1, int rad2) {
+    Mat g1, g2;
+    GaussianBlur(src, g1, Size(rad1,rad1), 0);
+    GaussianBlur(src, g2, Size(rad2,rad2), 0);
+    src = (g1-g2);
+    double min, max;
+    minMaxLoc(src, &min, &max);
+    // Scale the edges so they're easier to see (maybe this should go in a subsequent method)
+    src = 255*src/max;
+}
+
 //gives the percentage of differences in text in the image
 // it does this by counting the number of times text (0-blue color channel)
 // is the not the same between images and where it appears in one image is not in an area surrounding text
@@ -1055,14 +1067,14 @@ float paolMat::countDifsMask(paolMat *newIm){
 void paolMat::rectifyImage(paolMat *m){
     double widthP,heightP;
     double LTx,LTy,LBx,LBy,RTx,RTy,RBx,RBy;//L left R right T top B bottom
-    LTx=547;
-    LTy=290;
-    LBx=527;
-    LBy=932;
-    RTx=1831;
-    RTy=222;
-    RBx=1914;
-    RBy=904;
+    LTx=354;
+    LTy=236;
+    LBx=444;
+    LBy=706;
+    RTx=1915;
+    RTy=260;
+    RBx=1915;
+    RBy=727;
     int xInput,yInput;
     double LPx,LPy,RPx,RPy;//end points of line between edges on which point is found
     /*int rows,cols;

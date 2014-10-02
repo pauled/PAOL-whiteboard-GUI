@@ -94,6 +94,7 @@ public:
     void darkenText();
     void averageWhiteboard(int size);
     void enhanceText();
+    void dogEdges(int rad1, int rad2);
     float countDifsMask(paolMat *newIm);
 
     void rectifyImage(paolMat *m);
