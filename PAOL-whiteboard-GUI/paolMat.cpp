@@ -1024,16 +1024,22 @@ void paolMat::enhanceText(){
         }
 }
 
-// Get the edges produced by the difference of Gaussians
+// Get the edges produced by the difference of Gaussians (rad1 should be larger than rad2)
 void paolMat::dogEdges(int rad1, int rad2) {
     Mat g1, g2;
     GaussianBlur(src, g1, Size(rad1,rad1), 0);
     GaussianBlur(src, g2, Size(rad2,rad2), 0);
     src = (g1-g2);
-    double min, max;
-    minMaxLoc(src, &min, &max);
-    // Scale the edges so they're easier to see (maybe this should go in a subsequent method)
-    src = 255*src/max;
+}
+
+// Adjusts the image's color levels with the given black/white thresholds and gamma value
+void paolMat::adjustLevels(int lo, int hi, double gamma) {
+    src = 255/pow(hi-lo, 1/gamma)*(src-lo)^(1/gamma);
+}
+
+// Converts the image to its negative (currently broken)
+void paolMat::invert() {
+    src = 255-src;
 }
 
 //gives the percentage of differences in text in the image
