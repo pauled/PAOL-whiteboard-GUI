@@ -74,17 +74,15 @@ void MainWindow::processWhiteboard(){
         // Test the dogEdges and adjustLevels function
         rawEnhanced->copy(cam);
         rawEnhanced->dogEdges(21, 1);
-        rawEnhanced->displayImage(*ui->imDisplay2);
         rawEnhanced->adjustLevels(0, 7, 1);
-        rawEnhanced->displayImage(*ui->imDisplay4);
         rawEnhanced->invert();
-        rawEnhanced->displayImage(*ui->imDisplay5);
+        rawEnhanced->displayImage(*ui->imDisplay2);
 
         //copy the input image and process it to highlight the text
-        rawEnhanced->copy(cam);
-        rawEnhanced->averageWhiteboard(20);
-        rawEnhanced->enhanceText();
-        //rawEnhanced->displayImage(*ui->imDisplay8);
+//        rawEnhanced->copy(cam);
+//        rawEnhanced->averageWhiteboard(20);
+//        rawEnhanced->enhanceText();
+//        rawEnhanced->displayImage(*ui->imDisplay5);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
@@ -129,7 +127,7 @@ void MainWindow::processWhiteboard(){
         backgroundRefined->copyMask(background);
         //backgroundRefined->displayImage(*ui->imDisplay10);
         rectified->rectifyImage(backgroundRefined);
-//        rectified->displayImage(*ui->imDisplay10);
+        rectified->displayImage(*ui->imDisplay10);
         //////////////////////////////////////////////////
 
         //figure out if saves need to be made

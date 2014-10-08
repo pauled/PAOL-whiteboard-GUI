@@ -1039,7 +1039,13 @@ void paolMat::adjustLevels(int lo, int hi, double gamma) {
 
 // Converts the image to its negative (currently broken)
 void paolMat::invert() {
-    src = 255-src;
+    for(int i = 0; i < src.rows; i++) {
+        for(int j = 0; j < src.cols; j++) {
+            src.at<Vec3b>(i, j)[0] = 255 - src.at<Vec3b>(i, j)[0];
+            src.at<Vec3b>(i, j)[1] = 255 - src.at<Vec3b>(i, j)[1];
+            src.at<Vec3b>(i, j)[2] = 255 - src.at<Vec3b>(i, j)[2];
+        }
+    }
 }
 
 //gives the percentage of differences in text in the image
@@ -1079,7 +1085,7 @@ void paolMat::rectifyImage(paolMat *m){
     LBy=706;
     RTx=1915;
     RTy=260;
-    RBx=1915;
+    RBx=1825;
     RBy=727;
     int xInput,yInput;
     double LPx,LPy,RPx,RPy;//end points of line between edges on which point is found
