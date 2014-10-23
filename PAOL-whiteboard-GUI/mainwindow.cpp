@@ -46,7 +46,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::processWhiteboard(){
     //take picture
-    cam->displayImage(*ui->imDisplay1);
+//    cam->displayImage(*ui->imDisplay1);
 
     //compare picture to previous picture and store differences in old->maskMin
     numDif=old->differenceMin(cam,40,1);
@@ -73,16 +73,23 @@ void MainWindow::processWhiteboard(){
 
         // Test the dogEdges and adjustLevels function
         rawEnhanced->copy(cam);
+//        rawEnhanced->displayImage(*ui->imDisplay2);
         rawEnhanced->dogEdges(21, 1);
         rawEnhanced->adjustLevels(0, 7, 1);
-        rawEnhanced->invert();
-        rawEnhanced->displayImage(*ui->imDisplay2);
+        rawEnhanced->bwMask(50);
+//        rawEnhanced->displayMask(*ui->imDisplay3);
+
+        int **components;
+        components = new int*[rawEnhanced->src.rows];
+        for(int i =0; i < rawEnhanced->src.rows; i++)
+            components[i] = new int[rawEnhanced->src.cols];
+        rawEnhanced->getConnectedComponents(components);
+        rawEnhanced->displayMask(*ui->imDisplay5);
 
         //copy the input image and process it to highlight the text
-//        rawEnhanced->copy(cam);
-//        rawEnhanced->averageWhiteboard(20);
-//        rawEnhanced->enhanceText();
-//        rawEnhanced->displayImage(*ui->imDisplay5);
+        rawEnhanced->copy(cam);
+        rawEnhanced->averageWhiteboard(20);
+        rawEnhanced->enhanceText();
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
@@ -98,6 +105,7 @@ void MainWindow::processWhiteboard(){
         //fill in area surrounded by convex hull
         old->sweepDownMin();
         old->keepWhiteMaskMin();
+//        old->displayMaskMin(*ui->imDisplay2);
         ///////////////////////////////////////////////////////////////////////
 
         //process to identify text location
@@ -106,8 +114,11 @@ void MainWindow::processWhiteboard(){
         cam->blur(1);
         //find edge information and store total edge information in 0 (blue) color channel of mask
         cam->pDrift();
+        // TODO: Try doing intersection of Sobel filter and Gaussian diff here
+
         //grow the area around where the edges are found (if edge in channel 0 grow in channel 2)
         cam->grow(15,3);
+//        cam->displayMask(*ui->imDisplay5);
         ////////////////////////////////////////////////////////////////////////////////
 
         //process to update background image
@@ -115,19 +126,22 @@ void MainWindow::processWhiteboard(){
         //copy movement information into rawEnhanced and then expand to full mask
         rawEnhanced->copyMaskMin(old);
         rawEnhanced->maskMinToMaskBinary();
+//        rawEnhanced->displayMask(*ui->imDisplay5);
 
         //update the background image with new information
         background->updateBack2(rawEnhanced,cam);
 
         //copy the background image to one for processing
         backgroundRefined->copy(background);
+//        backgroundRefined->displayImage(*ui->imDisplay4);
         //darken text and set whiteboard to white
         backgroundRefined->darkenText();
+//        backgroundRefined->displayImage(*ui->imDisplay5);
         //copy text location information into mask
         backgroundRefined->copyMask(background);
         //backgroundRefined->displayImage(*ui->imDisplay10);
         rectified->rectifyImage(backgroundRefined);
-        rectified->displayImage(*ui->imDisplay10);
+
         //////////////////////////////////////////////////
 
         //figure out if saves need to be made

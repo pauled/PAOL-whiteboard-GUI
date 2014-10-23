@@ -97,6 +97,8 @@ public:
     void dogEdges(int rad1, int rad2);
     void adjustLevels(int lo, int hi, double gamma);
     void invert();
+    void getConnectedComponents(int** a);
+    void bwMask(int threshold);
     float countDifsMask(paolMat *newIm);
 
     void rectifyImage(paolMat *m);

@@ -14,10 +14,12 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    paolMat.cpp
+    paolMat.cpp \
+    uf.cpp
 
 HEADERS  += mainwindow.h \
-    paolMat.h
+    paolMat.h \
+    uf.h
 
 FORMS    += mainwindow.ui
 

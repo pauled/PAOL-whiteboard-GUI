@@ -1,4 +1,9 @@
 #include "paolMat.h"
+#include "uf.h"
+#include <map>
+#include <typeinfo>
+#include <iostream>
+#include <stdexcept>
 
 paolMat::paolMat()
 {
@@ -1029,15 +1034,34 @@ void paolMat::dogEdges(int rad1, int rad2) {
     Mat g1, g2;
     GaussianBlur(src, g1, Size(rad1,rad1), 0);
     GaussianBlur(src, g2, Size(rad2,rad2), 0);
-    src = (g1-g2);
+    mask = (g1-g2);
 }
 
 // Adjusts the image's color levels with the given black/white thresholds and gamma value
 void paolMat::adjustLevels(int lo, int hi, double gamma) {
-    src = 255/pow(hi-lo, 1/gamma)*(src-lo)^(1/gamma);
+    mask = 255/pow(hi-lo, 1/gamma)*(mask-lo)^(1/gamma);
 }
 
-// Converts the image to its negative (currently broken)
+// Turn mask black and white based on threshold
+void paolMat::bwMask(int threshold) {
+    for(int i = 0; i < mask.rows; i++) {
+        for(int j = 0; j < mask.cols; j++) {
+            if(mask.at<Vec3b>(i,j)[0] > threshold ||
+                    mask.at<Vec3b>(i,j)[1] > threshold ||
+                    mask.at<Vec3b>(i,j)[2] > threshold) {
+                mask.at<Vec3b>(i,j)[0] = 255;
+                mask.at<Vec3b>(i,j)[1] = 255;
+                mask.at<Vec3b>(i,j)[2] = 255;
+            } else {
+                mask.at<Vec3b>(i,j)[0] = 0;
+                mask.at<Vec3b>(i,j)[1] = 0;
+                mask.at<Vec3b>(i,j)[2] = 0;
+            }
+        }
+    }
+}
+
+// Converts the image to its negative
 void paolMat::invert() {
     for(int i = 0; i < src.rows; i++) {
         for(int j = 0; j < src.cols; j++) {
@@ -1046,6 +1070,112 @@ void paolMat::invert() {
             src.at<Vec3b>(i, j)[2] = 255 - src.at<Vec3b>(i, j)[2];
         }
     }
+}
+
+// Populates a 2D array with the connected components
+void paolMat::getConnectedComponents(int** a) {
+    // Initialize a by filling it with -1's
+    for(int i = 0; i < mask.rows; i++) {
+        for(int j = 0; j < mask.cols; j++) {
+            a[i][j] = -1;
+        }
+    }
+    // The disjoint set structure that keeps track of component classes
+    UF compClasses;
+    // Counter for the regions in the image
+    int regCounter = 1;
+    for(int i = 0; i < mask.rows; i++) {
+        for(int j = 0; j < mask.cols; j++) {
+            // Set component class if mask is white at current pixel
+            if(mask.at<Vec3b>(i, j)[0] == 255) {
+                // Check surrounding pixels
+                if(i-1 < 0) {
+                    // On top boundary, so just check left
+                    if(j-1 < 0) {
+                        // This is the TL pixel, so set as new class
+                        a[i][j] = regCounter;
+                        compClasses.addClass(regCounter);
+                        regCounter++;
+                    }
+                    else if(a[i][j-1] == -1) {
+                        // No left neighbor, so set pixel as new class
+                        a[i][j] = regCounter;
+                        compClasses.addClass(regCounter);
+                        regCounter++;
+                    }
+                    else {
+                        // Assign pixel class to the same as left neighbor
+                        a[i][j] = a[i][j-1];
+                    }
+                }
+                else {
+                    if(j-1 < 0) {
+                        // On left boundary, so just check top
+                        if(a[i-1][j] == -1) {
+                            // No top neighbor, so set pixel as new class
+                            a[i][j] = regCounter;
+                            compClasses.addClass(regCounter);
+                            regCounter++;
+                        }
+                        else {
+                            // Assign pixel class to same as top neighbor
+                            a[i][j] = a[i-1][j];
+                        }
+                    }
+                    else {
+                        // Normal case (get top and left neighbor and reassign classes if necessary)
+                        int topClass = a[i-1][j];
+                        int leftClass = a[i][j-1];
+                        if(topClass == -1 && leftClass == -1) {
+                            // No neighbor exists, so set pixel as new class
+                            a[i][j] = regCounter;
+                            compClasses.addClass(regCounter);
+                            regCounter++;
+                        }
+                        else if(topClass == -1 && leftClass != -1) {
+                            // Only left neighbor exists, so copy its class
+                            a[i][j] = leftClass;
+                        }
+                        else if(topClass != -1 && leftClass == -1) {
+                            // Only top neighbor exists, so copy its class
+                            a[i][j] = topClass;
+                        }
+                        else {
+                            // Both neighbors exist
+                            int minNeighbor = std::min(a[i-1][j], a[i][j-1]);
+                            int maxNeighbor = std::max(a[i-1][j], a[i][j-1]);
+                            a[i][j] = minNeighbor;
+                            // If we have differing neighbor values, merge them
+                            if(minNeighbor != maxNeighbor) {
+                                compClasses.merge(minNeighbor, maxNeighbor);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for(int i=0; i < mask.rows; i++) {
+        for(int j=0; j < mask.cols; j++) {
+            a[i][j] = compClasses.find(a[i][j]);
+            if(a[i][j] != -1) {
+                mask.at<Vec3b>(i,j)[0] = a[i][j]/255;
+                mask.at<Vec3b>(i,j)[1] = a[i][j]%255;
+                mask.at<Vec3b>(i,j)[3] = 0;
+            }
+        }
+    }
+
+    // TEMP: Write to test file; breaks regular processing for some reason
+//    vector<int> compression_params;
+//    compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+//    compression_params.push_back(9);
+//    try {
+//        imwrite("/home/paol/test.png", mask, compression_params);
+//    }
+//    catch (std::runtime_error& ex) {
+//        qDebug("Exception converting image to PNG format: %s\n", ex.what());
+//    }
 }
 
 //gives the percentage of differences in text in the image
