@@ -98,6 +98,7 @@ public:
     void adjustLevels(int lo, int hi, double gamma);
     void invert();
     void getConnectedComponents(int** a);
+    void addComponentsFromMask(int **components);
     void bwMask(int threshold);
     float countDifsMask(paolMat *newIm);
 

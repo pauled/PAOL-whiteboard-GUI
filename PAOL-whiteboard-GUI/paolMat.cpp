@@ -4,6 +4,7 @@
 #include <typeinfo>
 #include <iostream>
 #include <stdexcept>
+#include <set>
 
 paolMat::paolMat()
 {
@@ -1176,6 +1177,39 @@ void paolMat::getConnectedComponents(int** a) {
 //    catch (std::runtime_error& ex) {
 //        qDebug("Exception converting image to PNG format: %s\n", ex.what());
 //    }
+}
+
+// Given an array of the connected components, adds components that have pixels
+// in the edge detector (ie. pixels that have value 255 in the blue channel in
+// the mask)
+void paolMat::addComponentsFromMask(int **components) {
+    std::set<int> componentsToKeep;
+    int threshold = 20;
+    // Go through mask and keep track of components that intersect with the edge detector
+    for(int i=0; i < mask.rows; i++) {
+        for(int j=0; j < mask.cols; j++) {
+            if(mask.at<Vec3b>(i,j)[2] == 255 && components[i][j] > 0) {
+                componentsToKeep.insert(components[i][j]);
+            }
+        }
+    }
+    // Turn off components that did not intersect with the edge detector
+    for(int i=0; i < mask.rows; i++) {
+        for(int j=0; j < mask.cols; j++) {
+            if(componentsToKeep.find(components[i][j]) != componentsToKeep.end()) {
+                // Component should be kept
+                mask.at<Vec3b>(i,j)[0] = 255;
+                mask.at<Vec3b>(i,j)[1] = 255;
+                mask.at<Vec3b>(i,j)[2] = 255;
+            }
+            else {
+                // Component should be discarded
+                mask.at<Vec3b>(i,j)[0] = 0;
+                mask.at<Vec3b>(i,j)[1] = 0;
+                mask.at<Vec3b>(i,j)[2] = 0;
+            }
+        }
+    }
 }
 
 //gives the percentage of differences in text in the image

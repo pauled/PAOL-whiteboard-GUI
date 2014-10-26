@@ -17,6 +17,7 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
     void processWhiteboard();
+    void processWhiteboardWithCC();
     void rectifyImage();
     void findLines();
 

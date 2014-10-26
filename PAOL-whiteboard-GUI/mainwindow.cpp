@@ -71,21 +71,35 @@ void MainWindow::processWhiteboard(){
     //for two frames, and hence no lecturer present
     if(refinedNumDif>.04 || (numDif <.000001 && count==2)){
 
-        // Test the dogEdges and adjustLevels function
-        rawEnhanced->copy(cam);
-//        rawEnhanced->displayImage(*ui->imDisplay2);
-        rawEnhanced->dogEdges(21, 1);
-        rawEnhanced->adjustLevels(0, 7, 1);
-        rawEnhanced->bwMask(50);
-//        rawEnhanced->displayMask(*ui->imDisplay3);
+        bool processCC = true;
+        if(processCC) {
+            /////////////////////////////////////////////////////////////
+            // Get the connected components found by the DoG edge detector
+            paolMat dogMask;
+            dogMask.copy(cam);
+            dogMask.dogEdges(21, 1);
+            dogMask.adjustLevels(0, 7, 1);
+            dogMask.bwMask(50);
 
-        int **components;
-        components = new int*[rawEnhanced->src.rows];
-        for(int i =0; i < rawEnhanced->src.rows; i++)
-            components[i] = new int[rawEnhanced->src.cols];
-        rawEnhanced->getConnectedComponents(components);
-        rawEnhanced->displayMask(*ui->imDisplay5);
+            // Actually get the components
+            int **components;
+            components = new int*[dogMask.src.rows];
+            for(int i =0; i < dogMask.src.rows; i++)
+                components[i] = new int[dogMask.src.cols];
+            dogMask.getConnectedComponents(components);
+            dogMask.displayMask(*ui->imDisplay2);
 
+            // Keep components that intersect with Sobel filter
+            paolMat sobel;
+            sobel.copy(cam);
+            sobel.blur(1);
+            sobel.pDrift();
+            sobel.bwMask(10);
+            sobel.addComponentsFromMask(components);
+            sobel.displayMask(*ui->imDisplay5);
+        }
+
+        /////////////////////////////////////////////////////////////
         //copy the input image and process it to highlight the text
         rawEnhanced->copy(cam);
         rawEnhanced->averageWhiteboard(20);
@@ -105,7 +119,6 @@ void MainWindow::processWhiteboard(){
         //fill in area surrounded by convex hull
         old->sweepDownMin();
         old->keepWhiteMaskMin();
-//        old->displayMaskMin(*ui->imDisplay2);
         ///////////////////////////////////////////////////////////////////////
 
         //process to identify text location
@@ -114,11 +127,8 @@ void MainWindow::processWhiteboard(){
         cam->blur(1);
         //find edge information and store total edge information in 0 (blue) color channel of mask
         cam->pDrift();
-        // TODO: Try doing intersection of Sobel filter and Gaussian diff here
-
         //grow the area around where the edges are found (if edge in channel 0 grow in channel 2)
         cam->grow(15,3);
-//        cam->displayMask(*ui->imDisplay5);
         ////////////////////////////////////////////////////////////////////////////////
 
         //process to update background image
@@ -133,13 +143,12 @@ void MainWindow::processWhiteboard(){
 
         //copy the background image to one for processing
         backgroundRefined->copy(background);
-//        backgroundRefined->displayImage(*ui->imDisplay4);
         //darken text and set whiteboard to white
         backgroundRefined->darkenText();
-//        backgroundRefined->displayImage(*ui->imDisplay5);
+        if(!processCC)
+            backgroundRefined->displayImage(*ui->imDisplay5);
         //copy text location information into mask
         backgroundRefined->copyMask(background);
-        //backgroundRefined->displayImage(*ui->imDisplay10);
         rectified->rectifyImage(backgroundRefined);
 
         //////////////////////////////////////////////////
