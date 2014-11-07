@@ -79,7 +79,7 @@ void MainWindow::processWhiteboard(){
             dogMask.copy(cam);
             dogMask.dogEdges(21, 1);
             dogMask.adjustLevels(0, 7, 1);
-            dogMask.bwMask(50);
+            dogMask.binarizeMask(50);
 
             // Actually get the components
             int **components;
@@ -94,7 +94,7 @@ void MainWindow::processWhiteboard(){
             sobel.copy(cam);
             sobel.blur(1);
             sobel.pDrift();
-            sobel.bwMask(10);
+            sobel.binarizeMask(10);
             sobel.addComponentsFromMask(components);
             sobel.displayMask(*ui->imDisplay5);
         }
@@ -192,7 +192,22 @@ void MainWindow::displayFrame() {
         //rectified->copy(cam);
         //cam->rectifyImage(rectified);
 
-        processWhiteboard();
+        bool testIndivFrames = true;
+        if(testIndivFrames) {
+            paolMat lap;
+            lap.copy(cam);
+            lap.blurSrc(5);
+            lap.laplaceEdges();
+            lap.binarizeSrc(2);
+
+            namedWindow("hi", CV_WINDOW_KEEPRATIO);
+            imshow("hi", lap.src);
+
+            pause = !pause;
+        }
+        else
+            processWhiteboard();
+
         //rectifyImage();
         //findLines();
     }

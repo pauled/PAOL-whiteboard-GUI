@@ -1044,11 +1044,11 @@ void paolMat::adjustLevels(int lo, int hi, double gamma) {
 }
 
 // Turn mask black and white based on threshold
-void paolMat::bwMask(int threshold) {
+void paolMat::binarizeMask(int threshold) {
     for(int i = 0; i < mask.rows; i++) {
         for(int j = 0; j < mask.cols; j++) {
-            if(mask.at<Vec3b>(i,j)[0] > threshold ||
-                    mask.at<Vec3b>(i,j)[1] > threshold ||
+            if(mask.at<Vec3b>(i,j)[0] > threshold &&
+                    mask.at<Vec3b>(i,j)[1] > threshold &&
                     mask.at<Vec3b>(i,j)[2] > threshold) {
                 mask.at<Vec3b>(i,j)[0] = 255;
                 mask.at<Vec3b>(i,j)[1] = 255;
@@ -1057,6 +1057,25 @@ void paolMat::bwMask(int threshold) {
                 mask.at<Vec3b>(i,j)[0] = 0;
                 mask.at<Vec3b>(i,j)[1] = 0;
                 mask.at<Vec3b>(i,j)[2] = 0;
+            }
+        }
+    }
+}
+
+// Turn src black and white based on threshold
+void paolMat::binarizeSrc(int threshold) {
+    for(int i = 0; i < src.rows; i++) {
+        for(int j = 0; j < src.cols; j++) {
+            if(src.at<Vec3b>(i,j)[0] > threshold &&
+                    src.at<Vec3b>(i,j)[1] > threshold &&
+                    src.at<Vec3b>(i,j)[2] > threshold) {
+                src.at<Vec3b>(i,j)[0] = 255;
+                src.at<Vec3b>(i,j)[1] = 255;
+                src.at<Vec3b>(i,j)[2] = 255;
+            } else {
+                src.at<Vec3b>(i,j)[0] = 0;
+                src.at<Vec3b>(i,j)[1] = 0;
+                src.at<Vec3b>(i,j)[2] = 0;
             }
         }
     }
@@ -1210,6 +1229,16 @@ void paolMat::addComponentsFromMask(int **components) {
             }
         }
     }
+}
+
+// Blur the source by a Gaussian with the given radius
+void paolMat::blurSrc(int blurRad) {
+    GaussianBlur(src, src, Size(blurRad,blurRad), 0);
+}
+
+// Run the Laplace edge detector on the source
+void paolMat::laplaceEdges() {
+    Laplacian(src, src, -1);
 }
 
 //gives the percentage of differences in text in the image

@@ -99,7 +99,10 @@ public:
     void invert();
     void getConnectedComponents(int** a);
     void addComponentsFromMask(int **components);
-    void bwMask(int threshold);
+    void binarizeMask(int threshold);
+    void binarizeSrc(int threshold);
+    void blurSrc(int blurRad);
+    void laplaceEdges();
     float countDifsMask(paolMat *newIm);
 
     void rectifyImage(paolMat *m);
