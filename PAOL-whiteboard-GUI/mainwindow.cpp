@@ -74,9 +74,32 @@ void MainWindow::processWhiteboard(){
         /////////////////////////////////////////////////////////////
         //copy the input image and process it to highlight the text
         rawEnhanced->copy(cam);
-//        rawEnhanced->averageWhiteboard(20);
-//        rawEnhanced->enhanceText();
         rawEnhanced->displayImage(*ui->imDisplay1);
+
+        // Get the connected components found by the DoG edge detector
+        paolMat dog;
+        dog.copy(cam);
+        dog.dogEdges(13, 1);
+        dog.adjustLevels(0, 7, 1);
+        dog.binarizeMask(40);
+
+        // Actually get the components
+        int **components;
+        components = new int*[dog.src.rows];
+        for(int i =0; i < dog.src.rows; i++)
+            components[i] = new int[dog.src.cols];
+        dog.getConnectedComponents(components);
+
+        // Keep components that intersect with pDrift filter
+        paolMat pDrift;
+        pDrift.copy(cam);
+        pDrift.pDrift();
+        pDrift.binarizeMask(10);
+        pDrift.addComponentsFromMask(components);
+
+        // Whiten the whiteboard (note: pDrift.mask represents marker location)
+        rawEnhanced->darkenText2(pDrift.mask);
+        rawEnhanced->displayImage(*ui->imDisplay2);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
@@ -109,48 +132,16 @@ void MainWindow::processWhiteboard(){
         //copy movement information into rawEnhanced and then expand to full mask
         rawEnhanced->copyMaskMin(old);
         rawEnhanced->maskMinToMaskBinary();
+        rawEnhanced->displayMask(*ui->imDisplay4);
 
         //update the background image with new information
         background->updateBack2(rawEnhanced,cam);
-
-        //copy the background image to one for processing
-//        backgroundRefined->copy(background);
-//        backgroundRefined->displayImage(*ui->imDisplay4);
-        //darken text and set whiteboard to white
-//        backgroundRefined->darkenText();
-//        backgroundRefined->displayImage(*ui->imDisplay5);
-
-        // Get the connected components found by the DoG edge detector
-        paolMat dog;
-        dog.copy(background);
-        dog.displayImage(*ui->imDisplay2);
-        dog.dogEdges(13, 1);
-        dog.adjustLevels(0, 7, 1);
-        dog.binarizeMask(40);
-
-        // Actually get the components
-        int **components;
-        components = new int*[dog.src.rows];
-        for(int i =0; i < dog.src.rows; i++)
-            components[i] = new int[dog.src.cols];
-        dog.getConnectedComponents(components);
-
-        // Keep components that intersect with pDrift filter
-        paolMat pDrift;
-        pDrift.copy(background);
-        pDrift.pDrift();
-        pDrift.binarizeMask(10);
-        pDrift.addComponentsFromMask(components);
-        pDrift.displayMask(*ui->imDisplay4);
-
-        // Whiten the whiteboard (note: pDrift.mask represents marker location)
-        backgroundRefined->copy(background);
-        backgroundRefined->darkenText2(pDrift.mask);
+        background->displayImage(*ui->imDisplay5);
 
         //copy text location information into mask
 //        backgroundRefined->copyMask(background);
-        rectified->rectifyImage(backgroundRefined);
-        rectified->displayImage(*ui->imDisplay5);
+        rectified->rectifyImage(background);
+        rectified->displayImage(*ui->imDisplay6);
 
         //////////////////////////////////////////////////
 
