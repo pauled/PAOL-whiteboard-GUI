@@ -103,6 +103,7 @@ public:
     void binarizeSrc(int threshold);
     void blurSrc(int blurRad);
     void laplaceEdges();
+    void darkenText2(Mat marker);
     float countDifsMask(paolMat *newIm);
 
     void rectifyImage(paolMat *m);

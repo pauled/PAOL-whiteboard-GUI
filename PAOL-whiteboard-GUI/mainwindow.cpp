@@ -71,39 +71,12 @@ void MainWindow::processWhiteboard(){
     //for two frames, and hence no lecturer present
     if(refinedNumDif>.04 || (numDif <.000001 && count==2)){
 
-        bool processCC = true;
-        if(processCC) {
-            /////////////////////////////////////////////////////////////
-            // Get the connected components found by the DoG edge detector
-            paolMat dogMask;
-            dogMask.copy(cam);
-            dogMask.dogEdges(21, 1);
-            dogMask.adjustLevels(0, 7, 1);
-            dogMask.binarizeMask(50);
-
-            // Actually get the components
-            int **components;
-            components = new int*[dogMask.src.rows];
-            for(int i =0; i < dogMask.src.rows; i++)
-                components[i] = new int[dogMask.src.cols];
-            dogMask.getConnectedComponents(components);
-            dogMask.displayMask(*ui->imDisplay2);
-
-            // Keep components that intersect with Sobel filter
-            paolMat sobel;
-            sobel.copy(cam);
-            sobel.blur(1);
-            sobel.pDrift();
-            sobel.binarizeMask(10);
-            sobel.addComponentsFromMask(components);
-            sobel.displayMask(*ui->imDisplay5);
-        }
-
         /////////////////////////////////////////////////////////////
         //copy the input image and process it to highlight the text
         rawEnhanced->copy(cam);
-        rawEnhanced->averageWhiteboard(20);
-        rawEnhanced->enhanceText();
+//        rawEnhanced->averageWhiteboard(20);
+//        rawEnhanced->enhanceText();
+        rawEnhanced->displayImage(*ui->imDisplay1);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
@@ -136,20 +109,48 @@ void MainWindow::processWhiteboard(){
         //copy movement information into rawEnhanced and then expand to full mask
         rawEnhanced->copyMaskMin(old);
         rawEnhanced->maskMinToMaskBinary();
-//        rawEnhanced->displayMask(*ui->imDisplay5);
 
         //update the background image with new information
         background->updateBack2(rawEnhanced,cam);
 
         //copy the background image to one for processing
-        backgroundRefined->copy(background);
+//        backgroundRefined->copy(background);
+//        backgroundRefined->displayImage(*ui->imDisplay4);
         //darken text and set whiteboard to white
-        backgroundRefined->darkenText();
-        if(!processCC)
-            backgroundRefined->displayImage(*ui->imDisplay5);
+//        backgroundRefined->darkenText();
+//        backgroundRefined->displayImage(*ui->imDisplay5);
+
+        // Get the connected components found by the DoG edge detector
+        paolMat dog;
+        dog.copy(background);
+        dog.displayImage(*ui->imDisplay2);
+        dog.dogEdges(13, 1);
+        dog.adjustLevels(0, 7, 1);
+        dog.binarizeMask(40);
+
+        // Actually get the components
+        int **components;
+        components = new int*[dog.src.rows];
+        for(int i =0; i < dog.src.rows; i++)
+            components[i] = new int[dog.src.cols];
+        dog.getConnectedComponents(components);
+
+        // Keep components that intersect with pDrift filter
+        paolMat pDrift;
+        pDrift.copy(background);
+        pDrift.pDrift();
+        pDrift.binarizeMask(10);
+        pDrift.addComponentsFromMask(components);
+        pDrift.displayMask(*ui->imDisplay4);
+
+        // Whiten the whiteboard (note: pDrift.mask represents marker location)
+        backgroundRefined->copy(background);
+        backgroundRefined->darkenText2(pDrift.mask);
+
         //copy text location information into mask
-        backgroundRefined->copyMask(background);
+//        backgroundRefined->copyMask(background);
         rectified->rectifyImage(backgroundRefined);
+        rectified->displayImage(*ui->imDisplay5);
 
         //////////////////////////////////////////////////
 
@@ -192,7 +193,7 @@ void MainWindow::displayFrame() {
         //rectified->copy(cam);
         //cam->rectifyImage(rectified);
 
-        bool testIndivFrames = true;
+        bool testIndivFrames = false;
         if(testIndivFrames) {
             paolMat lap;
             lap.copy(cam);

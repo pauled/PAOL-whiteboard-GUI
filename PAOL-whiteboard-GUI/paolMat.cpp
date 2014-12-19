@@ -1203,7 +1203,6 @@ void paolMat::getConnectedComponents(int** a) {
 // the mask)
 void paolMat::addComponentsFromMask(int **components) {
     std::set<int> componentsToKeep;
-    int threshold = 20;
     // Go through mask and keep track of components that intersect with the edge detector
     for(int i=0; i < mask.rows; i++) {
         for(int j=0; j < mask.cols; j++) {
@@ -1239,6 +1238,20 @@ void paolMat::blurSrc(int blurRad) {
 // Run the Laplace edge detector on the source
 void paolMat::laplaceEdges() {
     Laplacian(src, src, -1);
+}
+
+// Whitens the whiteboard, given the location of the marker as an argument
+void paolMat::darkenText2(Mat marker){
+    //for every pixel
+    for(int y = 0; y < src.rows; y++)
+        for(int x = 0; x < src.cols; x++){
+            //if there isn't and edge (text) in that location turn the pixel white
+            if (marker.at<Vec3b>(y,x)[1]<50){
+                src.at<Vec3b>(y,x)[0]=255;
+                src.at<Vec3b>(y,x)[1]=255;
+                src.at<Vec3b>(y,x)[2]=255;
+            }
+        }
 }
 
 //gives the percentage of differences in text in the image
