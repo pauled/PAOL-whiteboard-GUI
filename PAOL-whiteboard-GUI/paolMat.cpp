@@ -1031,11 +1031,11 @@ void paolMat::enhanceText(){
 }
 
 // Get the edges produced by the difference of Gaussians (rad1 should be larger than rad2)
-void paolMat::dogEdges(int rad1, int rad2) {
+void paolMat::dogEdges(int kerSize, int rad1, int rad2) {
     Mat g1, g2;
-    GaussianBlur(src, g1, Size(rad1,rad1), 0);
-    GaussianBlur(src, g2, Size(rad2,rad2), 0);
-    mask = (g1-g2);
+    GaussianBlur(src, g1, Size(kerSize, kerSize), rad1);
+    GaussianBlur(src, g2, Size(kerSize, kerSize), rad2);
+    mask = g1 - g2;
 }
 
 // Adjusts the image's color levels with the given black/white thresholds and gamma value

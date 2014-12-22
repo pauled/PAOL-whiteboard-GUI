@@ -94,7 +94,7 @@ public:
     void darkenText();
     void averageWhiteboard(int size);
     void enhanceText();
-    void dogEdges(int rad1, int rad2);
+    void dogEdges(int kerSize, int rad1, int rad2);
     void adjustLevels(int lo, int hi, double gamma);
     void invert();
     void getConnectedComponents(int** a);

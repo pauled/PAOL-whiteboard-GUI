@@ -76,12 +76,19 @@ void MainWindow::processWhiteboard(){
         rawEnhanced->copy(cam);
         rawEnhanced->displayImage(*ui->imDisplay1);
 
+//        // Frame counter to save processed frames
+//        static int frameCount = 0;
+//        char *frameNum = new char[3];
+//        sprintf(frameNum, "%03d", frameCount);
+//        frameCount++;
+
         // Get the connected components found by the DoG edge detector
         paolMat dog;
         dog.copy(cam);
-        dog.dogEdges(13, 1);
-        dog.adjustLevels(0, 7, 1);
-        dog.binarizeMask(40);
+        dog.dogEdges(13, 17, 1);
+        dog.adjustLevels(0, 4, 1);
+        dog.binarizeMask(10);
+//        imwrite(string("/home/paol/shared/out/") + frameNum + "comps.png", dog.mask);
 
         // Actually get the components
         int **components;
@@ -95,7 +102,9 @@ void MainWindow::processWhiteboard(){
         pDrift.copy(cam);
         pDrift.pDrift();
         pDrift.binarizeMask(10);
+//        imwrite(string("/home/paol/shared/out/") + frameNum + "drift.png", pDrift.mask);
         pDrift.addComponentsFromMask(components);
+//        imwrite(string("/home/paol/shared/out/") + frameNum + "keptComps.png", pDrift.mask);
 
         // Whiten the whiteboard (note: pDrift.mask represents marker location)
         rawEnhanced->darkenText2(pDrift.mask);
@@ -141,7 +150,7 @@ void MainWindow::processWhiteboard(){
         //copy text location information into mask
 //        backgroundRefined->copyMask(background);
         rectified->rectifyImage(background);
-        rectified->displayImage(*ui->imDisplay6);
+//        rectified->displayImage(*ui->imDisplay6);
 
         //////////////////////////////////////////////////
 
@@ -186,15 +195,14 @@ void MainWindow::displayFrame() {
 
         bool testIndivFrames = false;
         if(testIndivFrames) {
-            paolMat lap;
-            lap.copy(cam);
-            lap.blurSrc(5);
-            lap.laplaceEdges();
-            lap.binarizeSrc(2);
+            paolMat dog;
+            dog.copy(cam);
+            dog.dogEdges(17, 17, 1);
+            dog.adjustLevels(0, 4, 1);
+            dog.binarizeMask(10);
 
-            namedWindow("hi", CV_WINDOW_KEEPRATIO);
-            imshow("hi", lap.src);
-
+            imwrite("/home/paol/shared/out/dog.png", dog.mask);
+            qDebug("Wrote frame");
             pause = !pause;
         }
         else
