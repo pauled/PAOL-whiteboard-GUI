@@ -9,7 +9,7 @@
 paolMat::paolMat()
 {
     cameraNum=-1;
-    scale=8;
+//    scale=8;
 }
 
 paolMat::paolMat(paolMat* m)
@@ -26,7 +26,7 @@ paolMat::paolMat(paolMat* m)
     countRead=m->countRead;
     time=m->time;
     dirOut=m->dirOut;
-    scale=m->scale;
+//    scale=m->scale;
 }
 
 paolMat::~paolMat()
@@ -66,7 +66,7 @@ void paolMat::copy(paolMat *m){
     countRead=m->countRead;
     time=m->time;
     dirOut=m->dirOut;
-    scale=m->scale;
+//    scale=m->scale;
 }
 
 void paolMat::copyClean(paolMat *m){
@@ -89,7 +89,7 @@ void paolMat::copyClean(paolMat *m){
     countRead=m->countRead;
     time=m->time;
     dirOut=m->dirOut;
-    scale=m->scale;
+//    scale=m->scale;
 }
 
 void paolMat::copyMaskMin(paolMat *m){
@@ -227,9 +227,35 @@ QImage paolMat::convertMaskMinToQImage(){
     return img;
 }
 
+QImage paolMat::convertMatToQImage(const Mat& mask) {
+    Mat display;
+    //copy mask Mat to display Mat and convert from BGR to RGB format
+    cvtColor(mask,display,CV_BGR2RGB);
+
+    //convert Mat to QImage
+    QImage img=QImage((const unsigned char*)(display.data),display.cols,display.rows,display.step,QImage::Format_RGB888)
+            .copy();
+    return img;
+}
+
+void paolMat::displayMat(const Mat& mat, QLabel &location){
+    //call method to convert Mat to QImage
+    QImage img=convertMatToQImage(mat);
+    //push image to display location "location"
+    location.setPixmap(QPixmap::fromImage(img));
+}
+
 void paolMat::displayImage(QLabel &location){
     //call method to convert Mat to QImage
     QImage img=convertToQImage();
+
+    // Frame counter to save processed frames
+    static int frameCount = 0;
+    char *name = new char[31];
+    sprintf(name, "/home/paol/shared/out/%03dbs.png", frameCount);
+    frameCount++;
+    img.save(name);
+
     //push image to display location "location"
     location.setPixmap(QPixmap::fromImage(img));
 }
@@ -309,7 +335,7 @@ float paolMat::differenceMin(paolMat *img, int thresh, int size){
 }
 
 // Process differences between shrunken versions of the two given frames
-void paolMat::differenceMin2(Mat& diffLocations, float& numDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size, int scale) {
+void paolMat::differenceMin2(Mat& diffLocations, float& numDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size) {
     int offset;
     bool diff;
     int surroundThresh = 50;
@@ -846,7 +872,7 @@ void paolMat::maskMinToMaskBinary(){
     }
 }
 
-Mat paolMat::maskMinToMaskBinary2(const Mat& orig, int scale) {
+Mat paolMat::maskMinToMaskBinary2(const Mat& orig) {
     Mat ret = Mat::zeros(Size(orig.cols*scale, orig.rows*scale), orig.type());
     bool center,right,down,corner;
     bool rightIn,downIn;//,cornerIn;
@@ -1036,7 +1062,7 @@ void paolMat::grow(int blueThresh, int size)
             }
 }
 
-Mat paolMat::grow2(const Mat& orig, int blueThresh, int size) {
+Mat paolMat::thresholdOnBlue(const Mat& orig, int blueThresh, int size) {
     Mat ret = Mat::zeros(orig.size(), orig.type());
     //for every pixel
     for(int y = size; y < orig.rows - size; y++) {
@@ -1045,12 +1071,8 @@ Mat paolMat::grow2(const Mat& orig, int blueThresh, int size) {
             if(orig.at<Vec3b>(y,x)[0] > blueThresh) {
                 //brighten edge
                 ret.at<Vec3b>(y,x)[0]=255;
-                //turn all the pixels in the square of size 2*size+1 around it on in the 2 color channel
-                for(int yy = y-size; yy <= y+size;yy++) {
-                    for(int xx = x-size; xx <= x+size; xx++) {
-                        ret.at<Vec3b>(yy,xx)[2] = 255;
-                    }
-                }
+                ret.at<Vec3b>(y,x)[1]=255;
+                ret.at<Vec3b>(y,x)[2]=255;
             }
         }
     }
@@ -1856,6 +1878,7 @@ Mat paolMat::addComponentsFromMask2(const Mat& compsImg, const Mat& edgeImg) {
     return ret;
 }
 
+// New method to find marker using DoG
 Mat paolMat::findMarker(const Mat& orig) {
     Mat markerCandidates = dogEdges2(orig, 13, 17, 1);
     markerCandidates = adjustLevels2(markerCandidates, 0, 4, 1);
@@ -1863,6 +1886,29 @@ Mat paolMat::findMarker(const Mat& orig) {
     Mat markerLocations = pDrift2(orig);
     markerLocations = binarizeMask2(markerLocations, 10);
     return addComponentsFromMask2(markerCandidates, markerLocations);
+}
+
+Mat paolMat::fillMarkerBorders(const Mat& grownEdges) {
+    //run a morphological closure (grow then shrink)
+    //this will fill in spaces in text caused by only looking at edges
+    int dilation_type = MORPH_RECT;
+    int dilation_size = 1;
+    Mat element = getStructuringElement( dilation_type,
+                                         Size( 2*dilation_size + 1, 2*dilation_size+1 ),
+                                         Point( dilation_size, dilation_size ) );
+    Mat temp;
+    dilate(grownEdges, temp, element);
+    erode(temp, temp, element);
+    return temp;
+}
+
+// Old, faster method to find marker
+Mat paolMat::findMarker2(const Mat &orig) {
+    Mat temp = blur2(orig, 1);
+    temp = pDrift2(temp);
+    temp = thresholdOnBlue(temp, 15, 3);
+    temp = fillMarkerBorders(temp);
+    return temp;
 }
 
 Mat paolMat::darkenText3(const Mat& orig, const Mat& marker) {

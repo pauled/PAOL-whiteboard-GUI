@@ -47,7 +47,6 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::processWhiteboard(){
-    int scale = dummyPM->scale;
 
     // Extract previous and current frames
     Mat prevFrame = old->src.clone();
@@ -55,14 +54,14 @@ void MainWindow::processWhiteboard(){
 
     // Find difference pixels
     Mat allDiffs;
-    dummyPM->differenceMin2(allDiffs, numDif, prevFrame, curFrame, 40, 1, scale);
+    paolMat::differenceMin2(allDiffs, numDif, prevFrame, curFrame, 40, 1);
 
     // Temporary Mat to store true differences
     Mat filteredDiffs = Mat::zeros(allDiffs.size(), allDiffs.type());
 
     //if there is enough of a difference between the two images
     if(numDif>.03){
-        dummyPM->shrinkMaskMin2(filteredDiffs, refinedNumDif, allDiffs);
+        paolMat::shrinkMaskMin2(filteredDiffs, refinedNumDif, allDiffs);
         count=0;
     } else {
         refinedNumDif=0;
@@ -78,10 +77,8 @@ void MainWindow::processWhiteboard(){
     if(refinedNumDif>.04 || (numDif <.000001 && count==2)){
 
         /////////////////////////////////////////////////////////////
-        //copy the input image and process it to highlight the text
-
-        dummyPM->src = curFrame;
-        dummyPM->displayImage(*ui->imDisplay1);
+        // Display the current frame being processed
+        paolMat::displayMat(curFrame, *ui->imDisplay1);
 
         // Frame counter to save processed frames
         static int frameCount = 0;
@@ -89,33 +86,29 @@ void MainWindow::processWhiteboard(){
         sprintf(frameNum, "%03d", frameCount);
         frameCount++;
 
-        Mat markerLocation = dummyPM->findMarker(curFrame);
-        Mat darkenedText = dummyPM->darkenText3(curFrame, markerLocation);
-        dummyPM->src = darkenedText;
-        dummyPM->displayImage(*ui->imDisplay2);
+        Mat markerLocation = paolMat::findMarker(curFrame);
+        Mat darkenedText = paolMat::darkenText3(curFrame, markerLocation);
+        paolMat::displayMat(markerLocation, *ui->imDisplay2);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
 
-        Mat diffHulls = dummyPM->expandDifferencesRegion(filteredDiffs);
-        Mat diffHullsFullSize = dummyPM->maskMinToMaskBinary2(diffHulls, scale);
-        dummyPM->src = diffHullsFullSize;
-        dummyPM->displayImage(*ui->imDisplay4);
+        Mat diffHulls = paolMat::expandDifferencesRegion(filteredDiffs);
+        Mat diffHullsFullSize = paolMat::maskMinToMaskBinary2(diffHulls);
+        paolMat::displayMat(diffHullsFullSize, *ui->imDisplay4);
 
         ////////////////////////////////////////////////////////////////////////////////
 
         // Update background image (whiteboard model)
 
-        Mat newWboardModel = dummyPM->updateBack3(background->src, darkenedText, diffHullsFullSize);
+        Mat newWboardModel = paolMat::updateBack3(background->src, darkenedText, diffHullsFullSize);
         // Copy updated whiteboard model
         background->src = newWboardModel;
-        dummyPM->src = newWboardModel;
-        dummyPM->displayImage(*ui->imDisplay5);
+        paolMat::displayMat(newWboardModel, *ui->imDisplay5);
 
         // Rectify the model
-        Mat rectified = dummyPM->rectifyImage2(newWboardModel);
-        dummyPM->src = rectified;
-        dummyPM->displayImage(*ui->imDisplay6);
+        Mat rectified = paolMat::rectifyImage2(newWboardModel);
+        paolMat::displayMat(rectified, *ui->imDisplay6);
 
         //////////////////////////////////////////////////
 
