@@ -32,6 +32,8 @@ MainWindow::MainWindow(QWidget *parent) :
     rawEnhanced=new paolMat();
     rectified=new paolMat();
 
+    dummyPM = new paolMat();
+
     count=0;
 
     qTimer = new QTimer(this);
@@ -45,27 +47,31 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::processWhiteboard(){
-    //take picture
-//    cam->displayImage(*ui->imDisplay1);
+    int scale = dummyPM->scale;
 
-    //compare picture to previous picture and store differences in old->maskMin
-    numDif=old->differenceMin(cam,40,1);
-//qDebug(" numDif=%f\n",numDif);
+    // Extract previous and current frames
+    Mat prevFrame = old->src.clone();
+    Mat curFrame = cam->src.clone();
+
+    // Find difference pixels
+    Mat allDiffs;
+    dummyPM->differenceMin2(allDiffs, numDif, prevFrame, curFrame, 40, 1, scale);
+
+    // Temporary Mat to store true differences
+    Mat filteredDiffs = Mat::zeros(allDiffs.size(), allDiffs.type());
 
     //if there is enough of a difference between the two images
     if(numDif>.03){
-        //set up a new % that represents difference
-        refinedNumDif=old->shrinkMaskMin();
+        dummyPM->shrinkMaskMin2(filteredDiffs, refinedNumDif, allDiffs);
         count=0;
     } else {
         refinedNumDif=0;
     }
+    qDebug("%f", refinedNumDif);
 
     //if the images are really identical, count the number of consecultive nearly identical images
     if (numDif < .000001)
         count++;
-
-//qDebug(" refinedNumDif=%f  numDif=%f\n",refinedNumDif,numDif);
 
     //if the differences are enough that we know where the lecturer is or the images have been identical
     //for two frames, and hence no lecturer present
@@ -73,98 +79,47 @@ void MainWindow::processWhiteboard(){
 
         /////////////////////////////////////////////////////////////
         //copy the input image and process it to highlight the text
-        rawEnhanced->copy(cam);
-        rawEnhanced->displayImage(*ui->imDisplay1);
 
-//        // Frame counter to save processed frames
-//        static int frameCount = 0;
-//        char *frameNum = new char[3];
-//        sprintf(frameNum, "%03d", frameCount);
-//        frameCount++;
+        dummyPM->src = curFrame;
+        dummyPM->displayImage(*ui->imDisplay1);
 
-        // Get the connected components found by the DoG edge detector
-        paolMat dog;
-        dog.copy(cam);
-        dog.dogEdges(13, 17, 1);
-        dog.adjustLevels(0, 4, 1);
-        dog.binarizeMask(10);
-//        imwrite(string("/home/paol/shared/out/") + frameNum + "comps.png", dog.mask);
+        // Frame counter to save processed frames
+        static int frameCount = 0;
+        char *frameNum = new char[3];
+        sprintf(frameNum, "%03d", frameCount);
+        frameCount++;
 
-        // Actually get the components
-        int **components;
-        components = new int*[dog.src.rows];
-        for(int i =0; i < dog.src.rows; i++)
-            components[i] = new int[dog.src.cols];
-        dog.getConnectedComponents(components);
-
-        // Keep components that intersect with pDrift filter
-        paolMat pDrift;
-        pDrift.copy(cam);
-        pDrift.pDrift();
-        pDrift.binarizeMask(10);
-//        imwrite(string("/home/paol/shared/out/") + frameNum + "drift.png", pDrift.mask);
-        pDrift.addComponentsFromMask(components);
-//        imwrite(string("/home/paol/shared/out/") + frameNum + "keptComps.png", pDrift.mask);
-
-        // Whiten the whiteboard (note: pDrift.mask represents marker location)
-        rawEnhanced->darkenText2(pDrift.mask);
-        rawEnhanced->displayImage(*ui->imDisplay2);
+        Mat markerLocation = dummyPM->findMarker(curFrame);
+        Mat darkenedText = dummyPM->darkenText3(curFrame, markerLocation);
+        dummyPM->src = darkenedText;
+        dummyPM->displayImage(*ui->imDisplay2);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
 
-        //extend the area of differences and sweep differences for more solid area
-        old->extendMaskMinToEdges();
-        old->sweepDownMin();
-        //keep only the solid area and grow that region
-        old->keepWhiteMaskMin();
-        old->growMin(8);
-        //draw a convex hull around area of differences
-        old->findContoursMaskMin();
-        //fill in area surrounded by convex hull
-        old->sweepDownMin();
-        old->keepWhiteMaskMin();
-        ///////////////////////////////////////////////////////////////////////
+        Mat diffHulls = dummyPM->expandDifferencesRegion(filteredDiffs);
+        Mat diffHullsFullSize = dummyPM->maskMinToMaskBinary2(diffHulls, scale);
+        dummyPM->src = diffHullsFullSize;
+        dummyPM->displayImage(*ui->imDisplay4);
 
-        //process to identify text location
-
-        //smooth image
-        cam->blur(1);
-        //find edge information and store total edge information in 0 (blue) color channel of mask
-        cam->pDrift();
-        //grow the area around where the edges are found (if edge in channel 0 grow in channel 2)
-        cam->grow(15,3);
         ////////////////////////////////////////////////////////////////////////////////
 
-        //process to update background image
+        // Update background image (whiteboard model)
 
-        //copy movement information into rawEnhanced and then expand to full mask
-        rawEnhanced->copyMaskMin(old);
-        rawEnhanced->maskMinToMaskBinary();
-        rawEnhanced->displayMask(*ui->imDisplay4);
+        Mat newWboardModel = dummyPM->updateBack3(background->src, darkenedText, diffHullsFullSize);
+        // Copy updated whiteboard model
+        background->src = newWboardModel;
+        dummyPM->src = newWboardModel;
+        dummyPM->displayImage(*ui->imDisplay5);
 
-        //update the background image with new information
-        background->updateBack2(rawEnhanced,cam);
-        background->displayImage(*ui->imDisplay5);
-
-        //copy text location information into mask
-//        backgroundRefined->copyMask(background);
-        rectified->rectifyImage(background);
-//        rectified->displayImage(*ui->imDisplay6);
+        // Rectify the model
+        Mat rectified = dummyPM->rectifyImage2(newWboardModel);
+        dummyPM->src = rectified;
+        dummyPM->displayImage(*ui->imDisplay6);
 
         //////////////////////////////////////////////////
 
-        //figure out if saves need to be made
-
-        //count the number of differences in the refined text area between refined images
-        saveNumDif = oldBackgroundRefined->countDifsMask(backgroundRefined);
-        qDebug("save dif=%f",saveNumDif);
-        //NOTE: once the image has been cut down to just white board saveNumDif should be a way
-        //of determining what to save, write now crap from wall background causes it to be useless
-
-        //oldBackgroundRefined->displayMask(*ui->imDisplay12);
-        //copy last clean whiteboard image
-        oldBackgroundRefined->copy(backgroundRefined);
+        // TODO: figure out if saves need to be made based on detected marker
     }
 }
 
@@ -195,13 +150,11 @@ void MainWindow::displayFrame() {
 
         bool testIndivFrames = false;
         if(testIndivFrames) {
-            paolMat dog;
-            dog.copy(cam);
-            dog.dogEdges(17, 17, 1);
-            dog.adjustLevels(0, 4, 1);
-            dog.binarizeMask(10);
+            paolMat pm;
+            Mat marker = pm.findMarker(cam->src);
+            Mat darkenedText = pm.darkenText3(cam->src, marker);
+            imwrite("/home/paol/shared/out/darkenedText.png", darkenedText);
 
-            imwrite("/home/paol/shared/out/dog.png", dog.mask);
             qDebug("Wrote frame");
             pause = !pause;
         }

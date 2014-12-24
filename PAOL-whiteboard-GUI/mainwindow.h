@@ -42,6 +42,7 @@ private:
     paolMat *oldBackgroundRefined;
     paolMat *rawEnhanced;
     paolMat *rectified;
+    paolMat *dummyPM;
 
     float numDif;
     float refinedNumDif;
