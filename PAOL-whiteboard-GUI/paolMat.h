@@ -58,40 +58,50 @@ private:
 public:
     ~paolMat();
 
+    /// Methods to read images from file or webcam
     bool initWebcam(int i);
-    bool takePicture2(Mat& destination);
+    bool takePictureFromWebcam(Mat& destination);
     bool initDataSetReadProps(QString firstImageLoc);
-    bool readNext2(Mat& destination);
+    bool readNextInDataSet(Mat& destination);
 
-    static void differenceMin2(Mat& maskMin, float &numDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size);
-    static void shrinkMaskMin2(Mat& filteredDiffs, float& numDiff, const Mat& origDiffs);
-    static Mat extendMaskMinToEdges2(const Mat& orig);
-    static Mat sweepDownMin2(const Mat& orig);
-    static Mat keepWhiteMaskMin2(const Mat& orig);
-    static Mat growMin2(const Mat& orig, int size);
-    static Mat growMin3(const Mat& orig, int size);
-    static Mat findContoursMaskMin2(const Mat& orig);
-    static Mat maskMinToMaskBinary2(const Mat& orig);
-    static Mat maskMinToMaskBinary3(const Mat& orig, int SCALE);
-    static Mat blur2(const Mat& orig, int size);
-    static Mat thresholdOnBlue(const Mat& orig, int blueThresh, int size);
-    static Mat updateBack3(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo);
-    static Mat averageWhiteboard2(const Mat& orig, int size);
-    static Mat enhanceText2(const Mat& orig);
-
-    static Mat dogEdges2(const Mat& orig, int kerSize, int rad1, int rad2);
-    static Mat adjustLevels2(const Mat& orig, int lo, int hi, double gamma);
-    static Mat binarizeMask2(const Mat& orig, int threshold);
-    static int** getConnectedComponents2(const Mat& orig);
-    static Mat pDrift2(const Mat& orig);
-    static Mat addComponentsFromMask2(const Mat& compsImg, const Mat& edgeImg);
-    static Mat findMarker(const Mat& orig);
-    static Mat fillMarkerBorders(const Mat& grownEdges);
-    static Mat findMarker2(const Mat& orig);
-    static Mat darkenText3(const Mat &orig, const Mat& marker);
+    /// Methods to find and process differences (ie. find the lecturer)
+    static void findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size);
+    static void filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat& origDiffs);
+    static Mat replicateToImageEdges(const Mat& orig);
+    static Mat sweepDown(const Mat& orig);
+    static Mat borderWithGreen(const Mat& orig, int size);
+    static Mat grow(const Mat& orig, int size);
+    static Mat getImageContours(const Mat& orig);
+    static Mat enlarge(const Mat& orig);
     static Mat expandDifferencesRegion(const Mat& differences);
-    static Mat rectifyImage2(const Mat& orig);
-    static Mat findBoard2(Mat& orig);
+
+    /// Methods to find the marker strokes
+    // Used for both old method (marker borders) and new method (DoG and connected components)
+    static Mat binarize(const Mat& orig, int threshold);
+    static Mat thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size);
+    static Mat pDrift(const Mat& orig);
+
+    // Used only for old method
+    static Mat fillMarkerBorders(const Mat& grownEdges);
+    static Mat findMarkerWithMarkerBorders(const Mat& orig);
+
+    // Used only for new method
+    static Mat getDoGEdges(const Mat& orig, int kerSize, int rad1, int rad2);
+    static Mat adjustLevels(const Mat& orig, int lo, int hi, double gamma);
+    static int** getConnectedComponents(const Mat& orig);
+    static Mat filterConnectedComponents(const Mat& compsImg, const Mat& edgeImg);
+    static Mat findMarkerWithCC(const Mat& orig);
+
+    /// Methods to enhance the whiteboard
+    static Mat boxBlur(const Mat& orig, int size);
+    static Mat getAvgWhiteboardColor(const Mat& orig, int size);
+    static Mat enhanceText(const Mat& orig);
+    static Mat whitenWhiteboard(const Mat &orig, const Mat& marker);
+    static Mat rectifyImage(const Mat& orig);
+    static Mat findWhiteboardBorders(Mat& orig);
+
+    /// Update the background (whiteboard) model
+    static Mat updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo);
 };
 
 #endif // PAOLMAT_H

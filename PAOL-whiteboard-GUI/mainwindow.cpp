@@ -42,7 +42,7 @@ void MainWindow::processWhiteboard(){
     // Find difference pixels
     float numDif;
     Mat allDiffs;
-    paolMat::differenceMin2(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
+    paolMat::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
 
     // Temporary Mat to store true differences
     Mat filteredDiffs = Mat::zeros(allDiffs.size(), allDiffs.type());
@@ -50,7 +50,7 @@ void MainWindow::processWhiteboard(){
     //if there is enough of a difference between the two images
     float refinedNumDif = 0;
     if(numDif>.03){
-        paolMat::shrinkMaskMin2(filteredDiffs, refinedNumDif, allDiffs);
+        paolMat::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
         count=0;
     }
 
@@ -67,16 +67,16 @@ void MainWindow::processWhiteboard(){
         displayMat(oldFrame, *ui->imDisplay1);
         displayMat(currentFrame, *ui->imDisplay2);
 
-//        Mat markerLocation = paolMat::findMarker(currentFrame);
-        Mat markerLocation = paolMat::findMarker2(currentFrame);
-        Mat darkenedText = paolMat::darkenText3(currentFrame, markerLocation);
+//        Mat markerLocation = paolMat::findMarkerWithCC(currentFrame);
+        Mat markerLocation = paolMat::findMarkerWithMarkerBorders(currentFrame);
+        Mat darkenedText = paolMat::whitenWhiteboard(currentFrame, markerLocation);
         displayMat(markerLocation, *ui->imDisplay3);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
 
         Mat diffHulls = paolMat::expandDifferencesRegion(filteredDiffs);
-        Mat diffHullsFullSize = paolMat::maskMinToMaskBinary2(diffHulls);
+        Mat diffHullsFullSize = paolMat::enlarge(diffHulls);
         displayMat(diffHullsFullSize, *ui->imDisplay4);
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -89,7 +89,7 @@ void MainWindow::processWhiteboard(){
         }
         else {
             // Update the existing whiteboard model
-            newWboardModel = paolMat::updateBack3(whiteboardModel, darkenedText, diffHullsFullSize);
+            newWboardModel = paolMat::updateWhiteboardModel(whiteboardModel, darkenedText, diffHullsFullSize);
         }
 
         // Copy updated whiteboard model
@@ -97,7 +97,7 @@ void MainWindow::processWhiteboard(){
         displayMat(newWboardModel, *ui->imDisplay5);
 
         // Rectify the model
-        Mat rectified = paolMat::rectifyImage2(newWboardModel);
+        Mat rectified = paolMat::rectifyImage(newWboardModel);
         displayMat(rectified, *ui->imDisplay6);
 
         //////////////////////////////////////////////////
@@ -118,7 +118,7 @@ void MainWindow::displayFrame() {
 
         // Take a picture if the webcam is running
         if(runCam){
-            if(!cam->takePicture2(currentFrame)) {
+            if(!cam->takePictureFromWebcam(currentFrame)) {
                 qWarning("Stopped processing. Please choose a new file or restart the camera.");
                 runCam = false;
             }
@@ -126,7 +126,7 @@ void MainWindow::displayFrame() {
 
         // Read the next picture in the data set if processing a data set
         if(runData){
-            if(!cam->readNext2(currentFrame)) {
+            if(!cam->readNextInDataSet(currentFrame)) {
                 qWarning("Stopped processing. Please choose a new file or restart the camera.");
                 runData=false;
             }
@@ -153,7 +153,7 @@ void MainWindow::on_camera_clicked()
 
     if(initWebcamWasSuccessful) {
         // Initialize whiteboard frames
-        cam->takePicture2(currentFrame);
+        cam->takePictureFromWebcam(currentFrame);
         whiteboardModel = Mat();
         oldFrame = Mat();
 
@@ -182,7 +182,7 @@ void MainWindow::on_loadDataSet_clicked()
 
     if(initWasSuccessful) {
         // Initialize whiteboard frames
-        cam->readNext2(currentFrame);
+        cam->readNextInDataSet(currentFrame);
         whiteboardModel = Mat();
         oldFrame = Mat();
 
