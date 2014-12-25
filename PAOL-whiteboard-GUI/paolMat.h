@@ -33,92 +33,51 @@ using namespace cv;
 
 class paolMat
 {
-public:
+private:
+
+    /// Constants
+    // Scaling factor for processing on smaller versions of whiteboard
+    static const int SCALE = 8;
+    // How many frames to search for in data set if the next frame is missing
+    static const int TIME_SKIP_LIMIT = 300;
+
+    /// Webcam object
     VideoCapture cam;
 
-    //image data
-    Mat src;
-    Mat mask;
-    Mat maskMin;//mask shrunk by scale factor squared
-    Mat displayMin;
-    Mat display;
+    /// Image read variables
+    // The location of the data set
+    string dataSetDir;
+    // The index of the next frame to read
+    // (ie. ## from cameraIn##)
+    int nextFrameIndex;
+    // The timestamp of the next frame to read
+    int nextFrameTime;
+    // The data set camera number
+    int datasetCamNum;
 
-    static const int scale = 8;//scale factor for maskMin
-
-    //image read variables
-    int cameraNum;
-    char readName[256];
-    int countRead;
-    int time;
-    std::string dirOut;
-
-    paolMat();
+public:
     ~paolMat();
-    paolMat(paolMat* m);
-    void copy(paolMat* m);
-    void copyClean(paolMat* m);
-    void copyMask(paolMat* m);
-    void copyMaskMin(paolMat* m);
 
-    void setCameraNum(int i);
-    void takePicture();
-    bool readNext(QWidget *fg);
+    bool initWebcam(int i);
+    bool takePicture2(Mat& destination);
+    bool initDataSetReadProps(QString firstImageLoc);
+    bool readNext2(Mat& destination);
 
-    QImage convertToQImage();
-    QImage convertMaskToQImage();
-    QImage convertMaskMinToQImage();
-    static QImage convertMatToQImage(const Mat& mat);
-    static void displayMat(const Mat& mat, QLabel &location);
-    void displayImage(QLabel& location);
-    void displayMask(QLabel& location);
-    void displayMaskMin(QLabel& location);
-
-    //maskMin methods
-    float differenceMin(paolMat *img, int thresh, int size);
     static void differenceMin2(Mat& maskMin, float &numDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size);
-    float shrinkMaskMin();
     static void shrinkMaskMin2(Mat& filteredDiffs, float& numDiff, const Mat& origDiffs);
-    void extendMaskMinToEdges();
     static Mat extendMaskMinToEdges2(const Mat& orig);
-    void sweepDownMin();
     static Mat sweepDownMin2(const Mat& orig);
-    void keepWhiteMaskMin();
     static Mat keepWhiteMaskMin2(const Mat& orig);
-    void growMin(int size);
     static Mat growMin2(const Mat& orig, int size);
     static Mat growMin3(const Mat& orig, int size);
-    void findContoursMaskMin();
     static Mat findContoursMaskMin2(const Mat& orig);
-    void maskMinToMaskBinary();
     static Mat maskMinToMaskBinary2(const Mat& orig);
-    static Mat maskMinToMaskBinary3(const Mat& orig, int scale);
-
-    //src and mask methods
-    //blur size is pixels adjacent i.e. 1 would be a 3x3 square centered on each pixel
-    void blur(int size);
+    static Mat maskMinToMaskBinary3(const Mat& orig, int SCALE);
     static Mat blur2(const Mat& orig, int size);
-    //pDrift is y+-1 x+-1
-    void pDrift();
-    void grow(int blueThresh, int size);
     static Mat thresholdOnBlue(const Mat& orig, int blueThresh, int size);
-    void nontextToWhite();
-    void updateBackgroundMaskMin(paolMat *m, paolMat *foreground);
-    void updateBack2(paolMat *foreground, paolMat *edgeInfo);
     static Mat updateBack3(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo);
-    void processText(paolMat *m);
-    void darkenText();
-    void averageWhiteboard(int size);
-    void enhanceText();
-    void dogEdges(int kerSize, int rad1, int rad2);
-    void adjustLevels(int lo, int hi, double gamma);
-    void invert();
-    int **getConnectedComponents();
-    void addComponentsFromMask(int **components);
-    void binarizeMask(int threshold);
-    void binarizeSrc(int threshold);
-    void blurSrc(int blurRad);
-    void laplaceEdges();
-    void darkenText2(Mat marker);
+    static Mat averageWhiteboard2(const Mat& orig, int size);
+    static Mat enhanceText2(const Mat& orig);
 
     static Mat dogEdges2(const Mat& orig, int kerSize, int rad1, int rad2);
     static Mat adjustLevels2(const Mat& orig, int lo, int hi, double gamma);
@@ -131,12 +90,8 @@ public:
     static Mat findMarker2(const Mat& orig);
     static Mat darkenText3(const Mat &orig, const Mat& marker);
     static Mat expandDifferencesRegion(const Mat& differences);
-
-    float countDifsMask(paolMat *newIm);
-
-    void rectifyImage(paolMat *m);
     static Mat rectifyImage2(const Mat& orig);
-    void findBoard(paolMat *m);
+    static Mat findBoard2(Mat& orig);
 };
 
 #endif // PAOLMAT_H

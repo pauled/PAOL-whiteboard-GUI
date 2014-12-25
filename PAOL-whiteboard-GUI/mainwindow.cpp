@@ -25,14 +25,6 @@ MainWindow::MainWindow(QWidget *parent) :
     pause=false;
 
     cam=new paolMat();
-    old=new paolMat();
-    background=new paolMat();
-    backgroundRefined=new paolMat();
-    oldBackgroundRefined=new paolMat();
-    rawEnhanced=new paolMat();
-    rectified=new paolMat();
-
-    dummyPM = new paolMat();
 
     count=0;
 
@@ -47,26 +39,20 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::processWhiteboard(){
-
-    // Extract previous and current frames
-    Mat prevFrame = old->src.clone();
-    Mat curFrame = cam->src.clone();
-
     // Find difference pixels
+    float numDif;
     Mat allDiffs;
-    paolMat::differenceMin2(allDiffs, numDif, prevFrame, curFrame, 40, 1);
+    paolMat::differenceMin2(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
 
     // Temporary Mat to store true differences
     Mat filteredDiffs = Mat::zeros(allDiffs.size(), allDiffs.type());
 
     //if there is enough of a difference between the two images
+    float refinedNumDif = 0;
     if(numDif>.03){
         paolMat::shrinkMaskMin2(filteredDiffs, refinedNumDif, allDiffs);
         count=0;
-    } else {
-        refinedNumDif=0;
     }
-    qDebug("%f", refinedNumDif);
 
     //if the images are really identical, count the number of consecultive nearly identical images
     if (numDif < .000001)
@@ -77,124 +63,173 @@ void MainWindow::processWhiteboard(){
     if(refinedNumDif>.04 || (numDif <.000001 && count==2)){
 
         /////////////////////////////////////////////////////////////
-        // Display the current frame being processed
-        paolMat::displayMat(curFrame, *ui->imDisplay1);
+        // Display the old and current frames being processed
+        displayMat(oldFrame, *ui->imDisplay1);
+        displayMat(currentFrame, *ui->imDisplay2);
 
-        // Frame counter to save processed frames
-        static int frameCount = 0;
-        char *frameNum = new char[3];
-        sprintf(frameNum, "%03d", frameCount);
-        frameCount++;
-
-        Mat markerLocation = paolMat::findMarker(curFrame);
-        Mat darkenedText = paolMat::darkenText3(curFrame, markerLocation);
-        paolMat::displayMat(markerLocation, *ui->imDisplay2);
+//        Mat markerLocation = paolMat::findMarker(currentFrame);
+        Mat markerLocation = paolMat::findMarker2(currentFrame);
+        Mat darkenedText = paolMat::darkenText3(currentFrame, markerLocation);
+        displayMat(markerLocation, *ui->imDisplay3);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
 
         Mat diffHulls = paolMat::expandDifferencesRegion(filteredDiffs);
         Mat diffHullsFullSize = paolMat::maskMinToMaskBinary2(diffHulls);
-        paolMat::displayMat(diffHullsFullSize, *ui->imDisplay4);
+        displayMat(diffHullsFullSize, *ui->imDisplay4);
 
         ////////////////////////////////////////////////////////////////////////////////
 
         // Update background image (whiteboard model)
+        Mat newWboardModel;
+        if(!whiteboardModel.data) {
+            // There is no previous whiteboard model, so set it to the enhanced image
+            newWboardModel = darkenedText;
+        }
+        else {
+            // Update the existing whiteboard model
+            newWboardModel = paolMat::updateBack3(whiteboardModel, darkenedText, diffHullsFullSize);
+        }
 
-        Mat newWboardModel = paolMat::updateBack3(background->src, darkenedText, diffHullsFullSize);
         // Copy updated whiteboard model
-        background->src = newWboardModel;
-        paolMat::displayMat(newWboardModel, *ui->imDisplay5);
+        whiteboardModel = newWboardModel.clone();
+        displayMat(newWboardModel, *ui->imDisplay5);
 
         // Rectify the model
         Mat rectified = paolMat::rectifyImage2(newWboardModel);
-        paolMat::displayMat(rectified, *ui->imDisplay6);
+        displayMat(rectified, *ui->imDisplay6);
 
         //////////////////////////////////////////////////
 
         // TODO: figure out if saves need to be made based on detected marker
+        // Strategy:
+        // Store a marker model
+        // Make updated version of marker model
+        // If updated version greatly differs from previous version, save whiteboard model
     }
-}
-
-void MainWindow::rectifyImage(){
-    rectified->rectifyImage(cam);
-    rectified->displayImage(*ui->imDisplay1);
-}
-
-void MainWindow::findLines(){
-    old->findBoard(cam);
-    old->displayImage(*ui->imDisplay1);
 }
 
 void MainWindow::displayFrame() {
     if(!pause && (runCam || runData)){
 
-        old->copy(cam);
+        // Set the previous frame
+        oldFrame = currentFrame.clone();
 
+        // Take a picture if the webcam is running
         if(runCam){
-            cam->takePicture();
+            if(!cam->takePicture2(currentFrame)) {
+                qWarning("Stopped processing. Please choose a new file or restart the camera.");
+                runCam = false;
+            }
         }
+
+        // Read the next picture in the data set if processing a data set
         if(runData){
-            if(!cam->readNext(this))
+            if(!cam->readNext2(currentFrame)) {
+                qWarning("Stopped processing. Please choose a new file or restart the camera.");
                 runData=false;
+            }
         }
-        //rectified->copy(cam);
-        //cam->rectifyImage(rectified);
 
-        bool testIndivFrames = false;
-        if(testIndivFrames) {
-            paolMat pm;
-            Mat marker = pm.findMarker(cam->src);
-            Mat darkenedText = pm.darkenText3(cam->src, marker);
-            imwrite("/home/paol/shared/out/darkenedText.png", darkenedText);
-
-            qDebug("Wrote frame");
-            pause = !pause;
-        }
-        else
-            processWhiteboard();
-
-        //rectifyImage();
-        //findLines();
+        processWhiteboard();
     }
 }
 
 
 void MainWindow::on_camera_clicked()
 {
+    // Stop processing
+    runCam=false;
     runData=false;
-    if(cam->src.data){
-        cam->~paolMat();
-        cam=new paolMat();
-    }
 
-    cam->setCameraNum(1);
-    cam->takePicture();
-    background->copy(cam);
-    backgroundRefined->copyClean(cam);
-    oldBackgroundRefined->copyClean(cam);
-    runCam=true;
-    pause=false;
+    // Clear the cam object
+    cam->~paolMat();
+    cam=new paolMat();
+
+    // Prompt the user for the webcam number and initialize the webcam
+    int webcamNum = promptWebcamNumber();
+    bool initWebcamWasSuccessful = cam->initWebcam(webcamNum);
+
+    if(initWebcamWasSuccessful) {
+        // Initialize whiteboard frames
+        cam->takePicture2(currentFrame);
+        whiteboardModel = Mat();
+        oldFrame = Mat();
+
+        // Start processing whiteboard
+        runCam = true;
+        pause = false;
+    }
+    else {
+        qWarning("Failed to initialize webcam. Please select a new webcam or file.");
+    }
 }
 
 void MainWindow::on_loadDataSet_clicked()
 {
+    // Stop processing
     runCam=false;
     runData=false;
-    if(cam->src.data){
-        cam->~paolMat();
-        cam=new paolMat();
-    }
 
-    cam->readNext(this);
-    background->copy(cam);
-    backgroundRefined->copyClean(cam);
-    oldBackgroundRefined->copyClean(cam);
-    runData=true;
-    pause=false;
+    // Clear the cam object
+    cam->~paolMat();
+    cam=new paolMat();
+
+    // Prompt the user for a file and attempt to initialize the data set to read
+    QString fileLoc = promptFirstDataSetImage();
+    bool initWasSuccessful = cam->initDataSetReadProps(fileLoc);
+
+    if(initWasSuccessful) {
+        // Initialize whiteboard frames
+        cam->readNext2(currentFrame);
+        whiteboardModel = Mat();
+        oldFrame = Mat();
+
+        // Start processing whiteboard
+        runData=true;
+        pause=false;
+    }
+    else {
+        qWarning("Failed to initialize data set properties. Please select a new file or webcam.");
+    }
 }
 
 void MainWindow::on_pause_clicked()
 {
     pause=!pause;
+}
+
+// Opens a dialog box to let the user choose the first image in a data set
+QString MainWindow::promptFirstDataSetImage() {
+    // tr is a method from QObject which facilitates localization
+    return QFileDialog::getOpenFileName(this, tr("Open First Image of Sequence"),".",
+                                        tr("Image Files (*.png *.bmp *.jpg *.JPG)"));
+}
+
+// Opens an input box to let the user choose the camera. Returns -1 if the user did not press "OK".
+int MainWindow::promptWebcamNumber() {
+    bool okPressed;
+    // tr is a method from QObject which facilitates localization
+    int webcamNum = QInputDialog::getInt(this, tr("Webcam"), tr("Enter webcam device number:"), 0, 0, 100, 1, &okPressed);
+    // Return the entered number if OK was pressed, otherwise return -1
+    return (okPressed ? webcamNum : -1);
+}
+
+QImage MainWindow::convertMatToQImage(const Mat& mask) {
+    Mat display;
+    //copy mask Mat to display Mat and convert from BGR to RGB format
+    cvtColor(mask,display,CV_BGR2RGB);
+
+    //convert Mat to QImage
+    QImage img=QImage((const unsigned char*)(display.data),display.cols,display.rows,display.step,QImage::Format_RGB888)
+            .copy();
+    return img;
+}
+
+void MainWindow::displayMat(const Mat& mat, QLabel &location) {
+    //call method to convert Mat to QImage
+    QImage img=convertMatToQImage(mat);
+    //push image to display location "location"
+    location.setPixmap(QPixmap::fromImage(img));
 }
