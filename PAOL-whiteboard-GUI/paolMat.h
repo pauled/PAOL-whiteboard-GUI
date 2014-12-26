@@ -55,11 +55,34 @@ private:
     // The data set camera number
     int datasetCamNum;
 
+    // Utility methods
+    /// Methods to find and process differences (ie. find the lecturer)
+    static Mat replicateToImageBorder(const Mat& orig);
+    static Mat sweepDown(const Mat& orig);
+    static Mat borderContentWithGreen(const Mat& content, int borderSize);
+    static Mat grow(const Mat& orig, int size);
+    static Mat getImageContours(const Mat& orig);
+
+    /// Methods to find the marker strokes
+    static Mat binarize(const Mat& orig, int threshold);
+    static Mat thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size);
+    static Mat pDrift(const Mat& orig);
+    static Mat fillMarkerBorders(const Mat& markerBorders);
+    static Mat getDoGEdges(const Mat& orig, int kerSize, float rad1, float rad2);
+    static Mat adjustLevels(const Mat& orig, int lo, int hi, double gamma);
+    static int** getConnectedComponents(const Mat& components);
+    static Mat filterConnectedComponents(const Mat& compsImg, const Mat& keepCompLocs);
+
+    /// Methods to enhance the whiteboard
+    static Mat boxBlur(const Mat& orig, int size);
+    static Mat getAvgWhiteboardColor(const Mat& whiteboardImg, int size);
+
+
 public:
     ~paolMat();
 
     /// Methods to read images from file or webcam
-    bool initWebcam(int i);
+    bool initWebcam(int deviceNum);
     bool takePictureFromWebcam(Mat& destination);
     bool initDataSetReadProps(QString firstImageLoc);
     bool readNextInDataSet(Mat& destination);
@@ -67,38 +90,18 @@ public:
     /// Methods to find and process differences (ie. find the lecturer)
     static void findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size);
     static void filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat& origDiffs);
-    static Mat replicateToImageEdges(const Mat& orig);
-    static Mat sweepDown(const Mat& orig);
-    static Mat borderWithGreen(const Mat& orig, int size);
-    static Mat grow(const Mat& orig, int size);
-    static Mat getImageContours(const Mat& orig);
     static Mat enlarge(const Mat& orig);
     static Mat expandDifferencesRegion(const Mat& differences);
 
     /// Methods to find the marker strokes
-    // Used for both old method (marker borders) and new method (DoG and connected components)
-    static Mat binarize(const Mat& orig, int threshold);
-    static Mat thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size);
-    static Mat pDrift(const Mat& orig);
-
-    // Used only for old method
-    static Mat fillMarkerBorders(const Mat& grownEdges);
-    static Mat findMarkerWithMarkerBorders(const Mat& orig);
-
-    // Used only for new method
-    static Mat getDoGEdges(const Mat& orig, int kerSize, int rad1, int rad2);
-    static Mat adjustLevels(const Mat& orig, int lo, int hi, double gamma);
-    static int** getConnectedComponents(const Mat& orig);
-    static Mat filterConnectedComponents(const Mat& compsImg, const Mat& edgeImg);
+    static Mat findMarkerWithMarkerBorders(const Mat& whiteboardImage);
     static Mat findMarkerWithCC(const Mat& orig);
 
     /// Methods to enhance the whiteboard
-    static Mat boxBlur(const Mat& orig, int size);
-    static Mat getAvgWhiteboardColor(const Mat& orig, int size);
-    static Mat enhanceText(const Mat& orig);
-    static Mat whitenWhiteboard(const Mat &orig, const Mat& marker);
-    static Mat rectifyImage(const Mat& orig);
-    static Mat findWhiteboardBorders(Mat& orig);
+    static Mat raiseMarkerContrast(const Mat& whiteboardImg);
+    static Mat whitenWhiteboard(const Mat &whiteboardImg, const Mat& markerPixels);
+    static Mat rectifyImage(const Mat& whiteboardImg);
+    static Mat findWhiteboardBorders(Mat& whiteboardImg);
 
     /// Update the background (whiteboard) model
     static Mat updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo);

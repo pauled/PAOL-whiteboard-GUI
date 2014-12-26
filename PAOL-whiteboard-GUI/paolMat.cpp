@@ -18,17 +18,19 @@ paolMat::~paolMat()
 ///
 ///////////////////////////////////////////////////////////////////
 
-bool paolMat::initWebcam(int i) {
+// Set the webcam to get frames from
+// Return true if the webcam is opened, false if it is not opened or the device number is invalid
+bool paolMat::initWebcam(int deviceNum) {
     // Reject negative input values
-    if(i < 0) {
-        qWarning("setCameraNum2: Attempted to open with an invalid webcam number %d.", i);
+    if(deviceNum < 0) {
+        qWarning("setCameraNum2: Attempted to open with an invalid webcam number %d.", deviceNum);
         return false;
     }
 
     // Initialize the camera and check if it is valid
-    cam = VideoCapture(i);
+    cam = VideoCapture(deviceNum);
     if(!cam.isOpened()) {
-        qWarning("setCameraNum2: Failed to open /dev/video%d.", i);
+        qWarning("setCameraNum2: Failed to open /dev/video%d.", deviceNum);
         return false;
     }
 
@@ -39,6 +41,8 @@ bool paolMat::initWebcam(int i) {
     return true;
 }
 
+// Grab a frame from the webcam and save it to the destination
+// Return true if a frame was successfully read from the webcam, false otherwise
 bool paolMat::takePictureFromWebcam(Mat& destination) {
     Mat temp;
     //grab 5 consecutive images to clear camera buffer
@@ -56,6 +60,9 @@ bool paolMat::takePictureFromWebcam(Mat& destination) {
     }
 }
 
+// Given the path of the first image in a data set, set the fields to enable
+// iterating through the data set
+// Return true if the fields were set correctly, false otherwise
 bool paolMat::initDataSetReadProps(QString firstImageLoc) {
     // Handle case where the given path is empty
     if(firstImageLoc.length() == 0) {
@@ -63,15 +70,15 @@ bool paolMat::initDataSetReadProps(QString firstImageLoc) {
         return false;
     }
 
-    // Convert QString to std::string
-    string locAsString = firstImageLoc.toStdString();
+    // Convert firstImageLoc to std::string
+    string locAsStdString = firstImageLoc.toStdString();
     // Get the data set directory by cutting off whatever is after the last "/"
-    dataSetDir = locAsString.substr(0, locAsString.find_last_of("/"));
+    dataSetDir = locAsStdString.substr(0, locAsStdString.find_last_of("/"));
 
     // Parse file name and get time and index of the next frame to read (ie. of the given image)
     // Set format of the first image location and use it to scan for next frame index and time
     string scanFormat = dataSetDir + "/cameraIn%06d-%10d-%d.png";
-    int scanResult = sscanf(locAsString.c_str(), scanFormat.c_str(), &nextFrameIndex, &nextFrameTime, &datasetCamNum);
+    int scanResult = sscanf(locAsStdString.c_str(), scanFormat.c_str(), &nextFrameIndex, &nextFrameTime, &datasetCamNum);
 
     // sscanf should have found three arguments
     if(scanResult == 3) {
@@ -109,7 +116,7 @@ bool paolMat::readNextInDataSet(Mat& destination) {
             return true;
         }
     }
-    qDebug("Failed to read the next file.");
+    qDebug("Failed to find the next file.");
     return false;
 }
 
@@ -120,7 +127,15 @@ bool paolMat::readNextInDataSet(Mat& destination) {
 ///////////////////////////////////////////////////////////////////
 
 // Shrink the two given images, then find the significantly different pixels between the shrunken images
-// Store the location of the different pixels in diffLocations, and the percentage of different pixels in percentDiff
+// For a pixel to be considered significantly different, one of the channels must differ by more than
+// the threshold between the two images
+// Arguments:
+//    diffLocations: Where to store the differences from the shrunken images
+//    percentDiff: Where to store the percentage of pixels that differ
+//    oldImg: The previous (older) whiteboard image
+//    newImg: The current (newer) whiteboard image
+//    thresh: How much a channel needs to differ between a pixel to count the pixel as a difference
+//    size: Size of window to use to filter out differences near edges
 void paolMat::findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size) {
     int offset;
     bool diff;
@@ -179,7 +194,10 @@ void paolMat::findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat
 }
 
 // Filter out pixels that are not surrounded by enough difference pixels
-// Store the filtered pixels in filteredDiffs, and the percentage of filtered pixels in percentDiff
+// Arguments:
+//    filteredDiffs: Where to store the pixels that are surrounded by enough difference pixels
+//    percentDiff: Where to store the percentage of white pixels in filteredDiffs
+//    origDiffs: The unfiltered difference pixels (gotten from findAllDiffsMini)
 void paolMat::filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat& origDiffs) {
     filteredDiffs = Mat::zeros(origDiffs.size(), origDiffs.type());
     int total;
@@ -205,36 +223,36 @@ void paolMat::filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat
     percentDiff = (float)percentDiff/(float)(origDiffs.rows*origDiffs.cols);
 }
 
-// Given a binary image, fill the image edges by replicating the adjacent pixel
-Mat paolMat::replicateToImageEdges(const Mat& orig) {
-    Mat ret = orig.clone();
+// Given a binary image, fill the image border by replicating the adjacent pixel
+Mat paolMat::replicateToImageBorder(const Mat& orig) {
+    Mat origWithBorderPixels = orig.clone();
     int x;
 
     //extend bottom and top edge where differences overlap
-    for(x=0;x<ret.cols;x++){
-        if(ret.at<Vec3b>(1,x)[1] == 255)
-            ret.at<Vec3b>(0,x)[1]=255;
-        if(ret.at<Vec3b>(ret.rows-2,x)[1] == 255)
-            ret.at<Vec3b>(ret.rows-1,x)[1]=255;
+    for(x=0;x<origWithBorderPixels.cols;x++){
+        if(origWithBorderPixels.at<Vec3b>(1,x)[1] == 255)
+            origWithBorderPixels.at<Vec3b>(0,x)[1]=255;
+        if(origWithBorderPixels.at<Vec3b>(origWithBorderPixels.rows-2,x)[1] == 255)
+            origWithBorderPixels.at<Vec3b>(origWithBorderPixels.rows-1,x)[1]=255;
     }
 
     //extend right and left edge wher differences overlap
-    for(int y = 0; y < ret.rows; y++)
+    for(int y = 0; y < origWithBorderPixels.rows; y++)
     {
-        if(ret.at<Vec3b>(y,1)[1] == 255)
-            ret.at<Vec3b>(y,0)[1] = 255;
+        if(origWithBorderPixels.at<Vec3b>(y,1)[1] == 255)
+            origWithBorderPixels.at<Vec3b>(y,0)[1] = 255;
 
-        if(ret.at<Vec3b>(y,ret.cols-2)[1] == 255)
-            ret.at<Vec3b>(y,ret.cols-1)[1] = 255;
+        if(origWithBorderPixels.at<Vec3b>(y,origWithBorderPixels.cols-2)[1] == 255)
+            origWithBorderPixels.at<Vec3b>(y,origWithBorderPixels.cols-1)[1] = 255;
     }
-    return ret;
+    return origWithBorderPixels;
 }
 
-// Sweep the given image (whatever that means)
+// Sweep the given image (whatever that means), returns a binary image
 Mat paolMat::sweepDown(const Mat& orig){
     bool left,right,top;
     //create a Mat the size of orig to store results
-    Mat ret=Mat::zeros(orig.size(),orig.type());
+    Mat sweeped=Mat::zeros(orig.size(),orig.type());
 
     //from left to right
     for(int x = 0; x < orig.cols; x++)
@@ -246,7 +264,7 @@ Mat paolMat::sweepDown(const Mat& orig){
                 top = true;
 
             if(top == true)
-                ret.at<Vec3b>(y,x)[0] = 255;
+                sweeped.at<Vec3b>(y,x)[0] = 255;
         }
     }
 
@@ -261,7 +279,7 @@ Mat paolMat::sweepDown(const Mat& orig){
                 left = true;
 
             if(left == true)
-                ret.at<Vec3b>(y,x)[1] = 255;
+                sweeped.at<Vec3b>(y,x)[1] = 255;
         }
 
         //sweep from the right
@@ -272,17 +290,21 @@ Mat paolMat::sweepDown(const Mat& orig){
                 right = true;
 
             if(right == true)
-                ret.at<Vec3b>(y,x)[2] = 255;
+                sweeped.at<Vec3b>(y,x)[2] = 255;
         }
     }
 
-    return ret;
+    return sweeped;
 }
 
-// Color the region around the white pixels of the given image with green
-Mat paolMat::borderWithGreen(const Mat& orig, int size)
+// Color the region around the white pixels of the given image with green. This
+// is helpful for debugging.
+// Arguments:
+//    content: A binary image with white pixels to place the border around
+//    borderSize: The thickness of the border
+Mat paolMat::borderContentWithGreen(const Mat& content, int borderSize)
 {
-    Mat ret = orig.clone();
+    Mat ret = content.clone();
     int startx,endx,starty,endy;
 
     //for every pixel in the image
@@ -291,19 +313,19 @@ Mat paolMat::borderWithGreen(const Mat& orig, int size)
 
             //if the pixel is turned on
             if(ret.at<Vec3b>(y,x)[0] == 255){
-                startx=x-size;
+                startx=x-borderSize;
                 if (startx<0)
                     startx=0;
 
-                starty=y-size;
+                starty=y-borderSize;
                 if (starty<0)
                     starty=0;
 
-                endx=x+size;
+                endx=x+borderSize;
                 if (endx>=ret.cols)
                     endx=ret.cols-1;
 
-                endy=y+size;
+                endy=y+borderSize;
                 if (endy>=ret.rows)
                     endy=ret.rows-1;
 
@@ -315,6 +337,7 @@ Mat paolMat::borderWithGreen(const Mat& orig, int size)
     return ret;
 }
 
+// Dilate the given image by the given size
 Mat paolMat::grow(const Mat& orig, int size) {
     Mat ret = orig.clone();
     Mat element = getStructuringElement(MORPH_RECT, Size(2*size+1,2*size+1));
@@ -322,8 +345,9 @@ Mat paolMat::grow(const Mat& orig, int size) {
     return ret;
 }
 
+// Get the contours of the given image
 Mat paolMat::getImageContours(const Mat& orig) {
-    Mat ret = orig.clone();
+    Mat contourImage = orig.clone();
     Mat src_gray;
     int thresh = 100;
     //int max_thresh = 255;
@@ -364,23 +388,24 @@ Mat paolMat::getImageContours(const Mat& orig) {
           for(int c=0;c<3;c++)
               count+=drawing.at<Vec3b>(y,x)[c];
           if(count>0)
-              ret.at<Vec3b>(y,x)[1]=255;
+              contourImage.at<Vec3b>(y,x)[1]=255;
       }
 
-    return ret;
+    return contourImage;
 }
 
+// Enlarge the given image by a factor of paolMat::SCALE
 Mat paolMat::enlarge(const Mat& orig) {
-    Mat ret = Mat::zeros(Size(orig.cols*SCALE, orig.rows*SCALE), orig.type());
+    Mat enlarged = Mat::zeros(Size(orig.cols*SCALE, orig.rows*SCALE), orig.type());
     bool center,right,down,corner;
     bool rightIn,downIn;//,cornerIn;
 
     //for every color channel
     for (int c=0;c<3;c++){
         //go through the mask scalexscale box
-        for (int y = 0; y < ret.rows; y+=SCALE)
+        for (int y = 0; y < enlarged.rows; y+=SCALE)
         {
-            for (int x = 0; x < ret.cols; x+=SCALE)
+            for (int x = 0; x < enlarged.cols; x+=SCALE)
             {
                 //set the location on if the corresponding location in maskMin is on
                 if (orig.at<Vec3b>(y/SCALE,x/SCALE)[c]!=0)
@@ -418,32 +443,32 @@ Mat paolMat::enlarge(const Mat& orig) {
 
                 //fill in mask based on which corners are turned on based on maskMin
                 if(center)
-                    ret.at<Vec3b>(y,x)[c]=255;
+                    enlarged.at<Vec3b>(y,x)[c]=255;
                 if(center || right)
-                    for(int xx=x+1; xx<ret.cols && xx<x+SCALE;xx++)
-                        ret.at<Vec3b>(y,xx)[c]=255;
+                    for(int xx=x+1; xx<enlarged.cols && xx<x+SCALE;xx++)
+                        enlarged.at<Vec3b>(y,xx)[c]=255;
                 if(center || down)
-                    for(int yy=y+1; yy<ret.rows && yy<y+SCALE; yy++)
-                        ret.at<Vec3b>(yy,x)[c]=255;
+                    for(int yy=y+1; yy<enlarged.rows && yy<y+SCALE; yy++)
+                        enlarged.at<Vec3b>(yy,x)[c]=255;
                 if(center || right || down || corner)
-                    for(int xx=x+1; xx<ret.cols && xx<x+SCALE;xx++)
-                        for(int yy=y+1; yy<ret.rows && yy<y+SCALE; yy++)
-                            ret.at<Vec3b>(yy,xx)[c]=255;
+                    for(int xx=x+1; xx<enlarged.cols && xx<x+SCALE;xx++)
+                        for(int yy=y+1; yy<enlarged.rows && yy<y+SCALE; yy++)
+                            enlarged.at<Vec3b>(yy,xx)[c]=255;
 
             }
         }
     }
-    return ret;
+    return enlarged;
 }
 
-// Covers the difference pixels by first dilating the difference, then drawing
-// a convex hull around the dilation
+// Covers the (filtered) difference pixels by first dilating the difference,
+// then drawing a convex hull around the dilation
 Mat paolMat::expandDifferencesRegion(const Mat& differences) {
     // Dilate the difference pixels
-    Mat grownDiffs = replicateToImageEdges(differences);
+    Mat grownDiffs = replicateToImageBorder(differences);
     grownDiffs = sweepDown(grownDiffs);
     grownDiffs = binarize(grownDiffs, 255);
-    grownDiffs = borderWithGreen(grownDiffs, 8);
+    grownDiffs = borderContentWithGreen(grownDiffs, 8);
 
     // Draw hull around the dilation
     Mat diffHulls = getImageContours(grownDiffs);
@@ -459,26 +484,34 @@ Mat paolMat::expandDifferencesRegion(const Mat& differences) {
 ///
 ///////////////////////////////////////////////////////////////////
 
+// Determine the pixels in orig where all the values of all three
+// channels are greater than the threshold
 Mat paolMat::binarize(const Mat& orig, int threshold) {
-    Mat ret = Mat::zeros(orig.size(), orig.type());
+    Mat binarized = Mat::zeros(orig.size(), orig.type());
     for(int i = 0; i < orig.rows; i++) {
         for(int j = 0; j < orig.cols; j++) {
             if(orig.at<Vec3b>(i,j)[0] >= threshold &&
                     orig.at<Vec3b>(i,j)[1] >= threshold &&
                     orig.at<Vec3b>(i,j)[2] >= threshold) {
-                ret.at<Vec3b>(i,j)[0] = 255;
-                ret.at<Vec3b>(i,j)[1] = 255;
-                ret.at<Vec3b>(i,j)[2] = 255;
+                binarized.at<Vec3b>(i,j)[0] = 255;
+                binarized.at<Vec3b>(i,j)[1] = 255;
+                binarized.at<Vec3b>(i,j)[2] = 255;
             } else {
-                ret.at<Vec3b>(i,j)[0] = 0;
-                ret.at<Vec3b>(i,j)[1] = 0;
-                ret.at<Vec3b>(i,j)[2] = 0;
+                binarized.at<Vec3b>(i,j)[0] = 0;
+                binarized.at<Vec3b>(i,j)[1] = 0;
+                binarized.at<Vec3b>(i,j)[2] = 0;
             }
         }
     }
-    return ret;
+    return binarized;
 }
 
+// Determine the pixels in orig where the value of the blue channel
+// is greater than the threshold. Ignores pixels on the image border
+// Arguments:
+//    orig: The image to threshold
+//    threshold: The minimum value of the blue channel
+//    size: The width of the image border to ignore
 Mat paolMat::thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size) {
     Mat ret = Mat::zeros(orig.size(), orig.type());
     //for every pixel
@@ -496,6 +529,10 @@ Mat paolMat::thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size) {
     return ret;
 }
 
+// Run a specialized edge filter on the original image. The derivative in the horizontal
+// direction is stored in the red channel (for vertical edges), the derivative in the
+// vertical direction is stored in the green channel (for horizontal edges), and the
+// sum is stored in the blue channel
 Mat paolMat::pDrift(const Mat& orig) {
     int temp,total;
     Mat ret = Mat::zeros(orig.size(), orig.type());
@@ -541,7 +578,8 @@ Mat paolMat::pDrift(const Mat& orig) {
     return ret;
 }
 
-Mat paolMat::fillMarkerBorders(const Mat& grownEdges) {
+// Given approximate borders (enclosures) of the marker strokes, fill in the enclosed regions
+Mat paolMat::fillMarkerBorders(const Mat& markerBorders) {
     //run a morphological closure (grow then shrink)
     //this will fill in spaces in text caused by only looking at edges
     int dilation_type = MORPH_RECT;
@@ -549,103 +587,122 @@ Mat paolMat::fillMarkerBorders(const Mat& grownEdges) {
     Mat element = getStructuringElement( dilation_type,
                                          Size( 2*dilation_size + 1, 2*dilation_size+1 ),
                                          Point( dilation_size, dilation_size ) );
-    Mat temp;
-    dilate(grownEdges, temp, element);
-    erode(temp, temp, element);
-    return temp;
+    Mat filledMarker;
+    dilate(markerBorders, filledMarker, element);
+    erode(filledMarker, filledMarker, element);
+    return filledMarker;
 }
 
-// Old, faster method to find marker
-Mat paolMat::findMarkerWithMarkerBorders(const Mat &orig) {
-    Mat temp = boxBlur(orig, 1);
+// Locates marker strokes by approximating the borders for the marker strokes, then
+// filling in the enclosed regions. This method is faster than the connected
+// components method, but not as accurate.
+Mat paolMat::findMarkerWithMarkerBorders(const Mat &whiteboardImage) {
+    Mat temp = boxBlur(whiteboardImage, 1);
     temp = pDrift(temp);
     temp = thresholdOnBlueChannel(temp, 15, 3);
     temp = fillMarkerBorders(temp);
     return temp;
 }
 
-Mat paolMat::getDoGEdges(const Mat& orig, int kerSize, int rad1, int rad2) {
+// Runs the Difference of Gaussians (DoG) edge detector on the given image.
+// TODO: Implement the DoG detector by first subtracting the Gaussian kernels,
+//       then filter the result with orig. I can't figure out how to do this.
+// Arguments:
+//    orig: The image to locate the edges of
+//    kerSize: The kernel size for the edge detector. It must be odd, otherwise
+//             the filter fails.
+//    sig1: The sigma of the first Gaussian blur. Should be larger than sig2.
+//    sig2: The sigma of the second Gaussian blur.
+Mat paolMat::getDoGEdges(const Mat& orig, int kerSize, float sig1, float sig2) {
     Mat g1, g2;
-    GaussianBlur(orig, g1, Size(kerSize, kerSize), rad1);
-    GaussianBlur(orig, g2, Size(kerSize, kerSize), rad2);
+    GaussianBlur(orig, g1, Size(kerSize, kerSize), sig1);
+    GaussianBlur(orig, g2, Size(kerSize, kerSize), sig2);
     return g1-g2;
 }
 
+// Change the brightness levels of the given image.
+// Arguments:
+//    orig: The image to adjust the brightness levels of
+//    lo: The low threshold of the input brightnesses
+//    hi: The high threshold of the input brightnesses
+//    gamma: The curvature of the level remapping
 Mat paolMat::adjustLevels(const Mat& orig, int lo, int hi, double gamma) {
     return 255/pow(hi-lo, 1/gamma)*(orig-lo)^(1/gamma);
 }
 
-int** paolMat::getConnectedComponents(const Mat& orig) {
-    int** a = new int*[orig.rows];
-    for(int i = 0; i < orig.rows; i++) {
-        a[i] = new int[orig.cols];
+// Given a binary image, locate the connected components in the image
+// WARNING: The returned array must be manually destroyed after use.
+int** paolMat::getConnectedComponents(const Mat& components) {
+    int** componentLabels = new int*[components.rows];
+    for(int i = 0; i < components.rows; i++) {
+        componentLabels[i] = new int[components.cols];
     }
 
     // The disjoint set structure that keeps track of component classes
     UF compClasses;
-    // Counter for the regions in the image
+    // Counter for the components in the image
     int regCounter = 1;
-    for(int i = 0; i < orig.rows; i++) {
-        for(int j = 0; j < orig.cols; j++) {
+    for(int i = 0; i < components.rows; i++) {
+        for(int j = 0; j < components.cols; j++) {
             // Set component class if mask is white at current pixel
-            if(orig.at<Vec3b>(i, j)[0] == 255) {
+            if(components.at<Vec3b>(i, j)[0] == 255) {
                 // Check surrounding pixels
                 if(i-1 < 0) {
                     // On top boundary, so just check left
                     if(j-1 < 0) {
                         // This is the TL pixel, so set as new class
-                        a[i][j] = regCounter;
+                        componentLabels[i][j] = regCounter;
                         compClasses.addClass(regCounter);
                         regCounter++;
                     }
-                    else if(a[i][j-1] == -1) {
+                    else if(componentLabels[i][j-1] == -1) {
                         // No left neighbor, so set pixel as new class
-                        a[i][j] = regCounter;
+                        componentLabels[i][j] = regCounter;
                         compClasses.addClass(regCounter);
                         regCounter++;
                     }
                     else {
                         // Assign pixel class to the same as left neighbor
-                        a[i][j] = a[i][j-1];
+                        componentLabels[i][j] = componentLabels[i][j-1];
                     }
                 }
                 else {
                     if(j-1 < 0) {
                         // On left boundary, so just check top
-                        if(a[i-1][j] == -1) {
+                        if(componentLabels[i-1][j] == -1) {
                             // No top neighbor, so set pixel as new class
-                            a[i][j] = regCounter;
+                            componentLabels[i][j] = regCounter;
                             compClasses.addClass(regCounter);
                             regCounter++;
                         }
                         else {
                             // Assign pixel class to same as top neighbor
-                            a[i][j] = a[i-1][j];
+                            componentLabels[i][j] = componentLabels[i-1][j];
                         }
                     }
                     else {
                         // Normal case (get top and left neighbor and reassign classes if necessary)
-                        int topClass = a[i-1][j];
-                        int leftClass = a[i][j-1];
+                        int topClass = componentLabels[i-1][j];
+                        int leftClass = componentLabels[i][j-1];
                         if(topClass == -1 && leftClass == -1) {
                             // No neighbor exists, so set pixel as new class
-                            a[i][j] = regCounter;
+                            componentLabels[i][j] = regCounter;
                             compClasses.addClass(regCounter);
                             regCounter++;
                         }
                         else if(topClass == -1 && leftClass != -1) {
                             // Only left neighbor exists, so copy its class
-                            a[i][j] = leftClass;
+                            componentLabels[i][j] = leftClass;
                         }
                         else if(topClass != -1 && leftClass == -1) {
                             // Only top neighbor exists, so copy its class
-                            a[i][j] = topClass;
+                            componentLabels[i][j] = topClass;
                         }
                         else {
                             // Both neighbors exist
-                            int minNeighbor = std::min(a[i-1][j], a[i][j-1]);
-                            int maxNeighbor = std::max(a[i-1][j], a[i][j-1]);
-                            a[i][j] = minNeighbor;
+                            int minNeighbor = std::min(componentLabels[i-1][j], componentLabels[i][j-1]);
+                            int maxNeighbor = std::max(componentLabels[i-1][j], componentLabels[i][j-1]);
+                            componentLabels[i][j] = minNeighbor;
                             // If we have differing neighbor values, merge them
                             if(minNeighbor != maxNeighbor) {
                                 compClasses.merge(minNeighbor, maxNeighbor);
@@ -655,40 +712,52 @@ int** paolMat::getConnectedComponents(const Mat& orig) {
                 }
             }
             else {
-                a[i][j] = -1;
+                // The pixel is black, so do not give a component label
+                componentLabels[i][j] = -1;
             }
         }
     }
-    for(int i=0; i < orig.rows; i++) {
-        for(int j=0; j < orig.cols; j++) {
-            a[i][j] = compClasses.find(a[i][j]);
+    // Unify the labels such that every pixel in a component has the same label
+    for(int i=0; i < components.rows; i++) {
+        for(int j=0; j < components.cols; j++) {
+            componentLabels[i][j] = compClasses.find(componentLabels[i][j]);
         }
     }
 
-    return a;
+    return componentLabels;
 }
 
-Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& edgeImg) {
-    Mat ret = Mat::zeros(compsImg.size(), compsImg.type());
+// Given the connected components and an additional binary image, keep the components
+// that overlap with a pixel from the other binary image.
+// Arguments:
+//    compsImg: The connected components (labels not yet assigned)
+//    keepCompLocs: The pixels that a component must overlap with to be kept
+Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompLocs) {
+    // Get the component labels
     int** components = getConnectedComponents(compsImg);
 
+    // Keep track of components that overlap with keepCompLocs
     std::set<int> componentsToKeep;
-    // Go through mask and keep track of components that intersect with the edge detector
-    for(int i=0; i < edgeImg.rows; i++) {
-        for(int j=0; j < edgeImg.cols; j++) {
-            if(edgeImg.at<Vec3b>(i,j)[2] == 255 && components[i][j] > 0) {
+    for(int i=0; i < keepCompLocs.rows; i++) {
+        for(int j=0; j < keepCompLocs.cols; j++) {
+            // Save the label of the component if the keepCompLocs pixel is white
+            // and there is a connected component at that location
+            if(keepCompLocs.at<Vec3b>(i,j)[2] == 255 && components[i][j] > 0) {
                 componentsToKeep.insert(components[i][j]);
             }
         }
     }
-    // Turn off components that did not intersect with the edge detector
-    for(int i=0; i < edgeImg.rows; i++) {
-        for(int j=0; j < edgeImg.cols; j++) {
-            if(componentsToKeep.find(components[i][j]) != componentsToKeep.end()) {
-                // Component should be kept
-                ret.at<Vec3b>(i,j)[0] = 255;
-                ret.at<Vec3b>(i,j)[1] = 255;
-                ret.at<Vec3b>(i,j)[2] = 255;
+
+    // Add the components that intersected with the edge detector
+    Mat filteredComps = Mat::zeros(compsImg.size(), compsImg.type());
+    for(int i=0; i < keepCompLocs.rows; i++) {
+        for(int j=0; j < keepCompLocs.cols; j++) {
+            // If the component is labeled and it was one of the kept components, add
+            // the pixels of the component to filteredComps
+            if(components[i][j] != -1 && componentsToKeep.find(components[i][j]) != componentsToKeep.end()) {
+                filteredComps.at<Vec3b>(i,j)[0] = 255;
+                filteredComps.at<Vec3b>(i,j)[1] = 255;
+                filteredComps.at<Vec3b>(i,j)[2] = 255;
             }
         }
     }
@@ -699,10 +768,12 @@ Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& edgeImg) 
     }
     delete [] components;
 
-    return ret;
+    return filteredComps;
 }
 
-// New method to find marker using DoG
+// Locate the marker strokes with the DoG and connected components approach.
+// First, find the DoG edges and threshold them. Then, use pDrift to determine
+// which connected components from the threholded DoG edges should be kept.
 Mat paolMat::findMarkerWithCC(const Mat& orig) {
     Mat markerCandidates = getDoGEdges(orig, 13, 17, 1);
     markerCandidates = adjustLevels(markerCandidates, 0, 4, 1);
@@ -718,32 +789,42 @@ Mat paolMat::findMarkerWithCC(const Mat& orig) {
 ///
 ///////////////////////////////////////////////////////////////////
 
+// Do a box blurring on the original image
+// Arguments:
+//    orig: The image to blur
+//    size: The radius of the box blur kernel
 Mat paolMat::boxBlur(const Mat& orig, int size) {
     Mat ret;
     cv::blur(orig, ret, Size(2*size+1, 2*size+1));
     return ret;
 }
 
-Mat paolMat::getAvgWhiteboardColor(const Mat& orig, int size) {
-    Mat ret = Mat::zeros(orig.size(), orig.type());
+// Approximate the whiteboard color at each pixel by splitting the image
+// into cells, then finding the average value of the brightest 25% of
+// pixels in the cell.
+// Arguments:
+//    whiteboardImg: The unmodified whiteboard image to extract the whiteboard colors of
+//    size: The size of the cells
+Mat paolMat::getAvgWhiteboardColor(const Mat& whiteboardImg, int size) {
+    Mat ret = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
     int x,y,xx,yy;
     int count,color,thresh;
     vector <int> pix;
     vector <int> ave;
 
     //go through the image by squares of radius size
-    for (x=0;x<orig.cols;x+=size)
-        for (y=0;y<orig.rows;y+=size){
+    for (x=0;x<whiteboardImg.cols;x+=size)
+        for (y=0;y<whiteboardImg.rows;y+=size){
             pix.clear();
             ave.clear();
 
             //within each square create a vector pix that hold all brightness values
             //for the pixels
-            for(xx=x; xx<x+size && xx<orig.cols; xx++)
-                for (yy=y; yy<y+size && yy<orig.rows; yy++){
+            for(xx=x; xx<x+size && xx<whiteboardImg.cols; xx++)
+                for (yy=y; yy<y+size && yy<whiteboardImg.rows; yy++){
                     color=0;
                     for (int c=0;c<3;c++)
-                        color+=orig.at<Vec3b>(yy,xx)[c];
+                        color+=whiteboardImg.at<Vec3b>(yy,xx)[c];
                     color/=3;
                     pix.push_back(color);
                 }
@@ -760,17 +841,17 @@ Mat paolMat::getAvgWhiteboardColor(const Mat& orig, int size) {
 
             //for all the pixels in the square add the color components to the averge vector
             //if the brightness is over the theshold
-            for(xx=x; xx<x+size && xx<orig.cols; xx++)
-                for (yy=y; yy<y+size && yy<orig.rows; yy++){
+            for(xx=x; xx<x+size && xx<whiteboardImg.cols; xx++)
+                for (yy=y; yy<y+size && yy<whiteboardImg.rows; yy++){
                     color=0;
                     for (int c=0;c<3;c++)
-                        color+=orig.at<Vec3b>(yy,xx)[c];
+                        color+=whiteboardImg.at<Vec3b>(yy,xx)[c];
                     color/=3;
 
                     if(color>=thresh){
                         count++;
                         for (int c=0;c<3;c++)
-                            ave[c]+=orig.at<Vec3b>(yy,xx)[c];
+                            ave[c]+=whiteboardImg.at<Vec3b>(yy,xx)[c];
                     }
                 }
             //figure out the average brightness of each channel for the brightest pixels
@@ -778,8 +859,8 @@ Mat paolMat::getAvgWhiteboardColor(const Mat& orig, int size) {
                 ave[c]/=count;
 
             //set the pixels in the mask to the average brightness of the image, square by square
-            for(xx=x; xx<x+size && xx<orig.cols; xx++)
-                for (yy=y; yy<y+size && yy<orig.rows; yy++){
+            for(xx=x; xx<x+size && xx<whiteboardImg.cols; xx++)
+                for (yy=y; yy<y+size && yy<whiteboardImg.rows; yy++){
                     for (int c=0;c<3;c++)
                         ret.at<Vec3b>(yy,xx)[c]=ave[c];
                 }
@@ -787,21 +868,21 @@ Mat paolMat::getAvgWhiteboardColor(const Mat& orig, int size) {
     return ret;
 }
 
-//Use the average image to turn the whiteboard of the image white and to darken the text
-Mat paolMat::enhanceText(const Mat& orig){
-    Mat ret = Mat::zeros(orig.size(), orig.type());
-    Mat avg = getAvgWhiteboardColor(orig, 10);
+// Given a whiteboard image, darken the text by scaling the difference from the average whiteboard color
+Mat paolMat::raiseMarkerContrast(const Mat& whiteboardImg){
+    Mat hiContrastImg = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
+    Mat avg = getAvgWhiteboardColor(whiteboardImg, 10);
 
     //for every pixel in the image and for every color channel
-    for(int x = 0; x < orig.cols; x++)
-        for(int y = 0; y < orig.rows; y++){
+    for(int x = 0; x < whiteboardImg.cols; x++)
+        for(int y = 0; y < whiteboardImg.rows; y++){
             for(int c=0;c<3;c++){
                 int dif;
                 //if the pixel is not 0 (just put in so that we don't divide by 0)
-                if (orig.at<Vec3b>(y,x)[c]>0){
+                if (whiteboardImg.at<Vec3b>(y,x)[c]>0){
                     //take the brightness of the pixel and divide it by what white is in
                     //that location (average from mask)
-                    dif=255*orig.at<Vec3b>(y,x)[c]/avg.at<Vec3b>(y,x)[c];
+                    dif=255*whiteboardImg.at<Vec3b>(y,x)[c]/avg.at<Vec3b>(y,x)[c];
                     //if it's brighter then white turn it white
                     if (dif>255)
                         dif=255;
@@ -814,19 +895,23 @@ Mat paolMat::enhanceText(const Mat& orig){
                 dif=255-(255-dif)*2;
                 if (dif<0)
                     dif=0;
-                ret.at<Vec3b>(y,x)[c]=dif;
+                hiContrastImg.at<Vec3b>(y,x)[c]=dif;
             }
         }
-    return ret;
+    return hiContrastImg;
 }
 
-Mat paolMat::whitenWhiteboard(const Mat& orig, const Mat& marker) {
-    Mat ret = orig.clone();
+// Given a whiteboard image and the marker locations, make the non-marker pixels white
+// Arguments:
+//    whiteboardImg: The whiteboard image to modify
+//    markerPixels: A binary image where the marker pixel locations are white
+Mat paolMat::whitenWhiteboard(const Mat& whiteboardImg, const Mat& markerPixels) {
+    Mat ret = whiteboardImg.clone();
     //for every pixel
-    for(int y = 0; y < orig.rows; y++)
-        for(int x = 0; x < orig.cols; x++){
+    for(int y = 0; y < whiteboardImg.rows; y++)
+        for(int x = 0; x < whiteboardImg.cols; x++){
             //if there isn't and edge (text) in that location turn the pixel white
-            if (marker.at<Vec3b>(y,x)[1]<50){
+            if (markerPixels.at<Vec3b>(y,x)[1]<50){
                 ret.at<Vec3b>(y,x)[0]=255;
                 ret.at<Vec3b>(y,x)[1]=255;
                 ret.at<Vec3b>(y,x)[2]=255;
@@ -835,8 +920,10 @@ Mat paolMat::whitenWhiteboard(const Mat& orig, const Mat& marker) {
     return ret;
 }
 
-Mat paolMat::rectifyImage(const Mat& orig){
-    Mat ret = Mat::zeros(orig.size(), orig.type());
+// Skew the given image so the whiteboard region is rectangular
+// TODO: Modify this method so it takes in a structure of corner coordinates
+Mat paolMat::rectifyImage(const Mat& whiteboardImg){
+    Mat ret = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
     double widthP,heightP;
     double LTx,LTy,LBx,LBy,RTx,RTy,RBx,RBy;//L left R right T top B bottom
     LTx=354;
@@ -863,12 +950,12 @@ Mat paolMat::rectifyImage(const Mat& orig){
             yInput=(int)(LPy+(RPy-LPy)*widthP);
 
             if (xInput >= 0 &&
-                    xInput < orig.cols &&
+                    xInput < whiteboardImg.cols &&
                     yInput >= 0 &&
-                    yInput < orig.rows){
-                ret.at<Vec3b>(y,x)[0] = orig.at<Vec3b>(yInput,xInput)[0];
-                ret.at<Vec3b>(y,x)[1] = orig.at<Vec3b>(yInput,xInput)[1];
-                ret.at<Vec3b>(y,x)[2] = orig.at<Vec3b>(yInput,xInput)[2];
+                    yInput < whiteboardImg.rows){
+                ret.at<Vec3b>(y,x)[0] = whiteboardImg.at<Vec3b>(yInput,xInput)[0];
+                ret.at<Vec3b>(y,x)[1] = whiteboardImg.at<Vec3b>(yInput,xInput)[1];
+                ret.at<Vec3b>(y,x)[2] = whiteboardImg.at<Vec3b>(yInput,xInput)[2];
             } else {
                 ret.at<Vec3b>(y,x)[0]=0;
                 ret.at<Vec3b>(y,x)[1]=0;
@@ -878,17 +965,19 @@ Mat paolMat::rectifyImage(const Mat& orig){
     return ret;
 }
 
-Mat paolMat::findWhiteboardBorders(Mat& orig) {
+// Given a whiteboard image, draw red lines through the long straight lines of
+// the image.
+Mat paolMat::findWhiteboardBorders(Mat& whiteboardImg) {
     // Find edges with Canny detector
     Mat cannyEdges;
-    Canny(orig, cannyEdges, 50, 200, 3);
+    Canny(whiteboardImg, cannyEdges, 50, 200, 3);
 
     // detect lines
     vector<Vec2f> lines;
     HoughLines(cannyEdges, lines, 1, CV_PI/180, 250, 0, 0 );
 
     // draw lines
-    Mat ret = orig.clone();
+    Mat ret = whiteboardImg.clone();
     for( size_t i = 0; i < lines.size(); i++ )
     {
         float rho = lines[i][0], theta = lines[i][1];
@@ -910,8 +999,11 @@ Mat paolMat::findWhiteboardBorders(Mat& orig) {
 ///
 ///////////////////////////////////////////////////////////////////
 
-// Given the current frame, previous frame, and foreground (lecturer) location,
-// return the current frame with the foreground pixels filled in with the previous
+// Arguments:
+//    oldWboardModel: The previous image of the whiteboard
+//    newInfo: The enhanced version of the current whiteboard image, which includes the professor
+//    mvmtInfo: A binary image indicating where there was significant movement (ie. where the
+//              professor might be)
 Mat paolMat::updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo) {
     // Throw exception if one of the given arguments has no image data
     // Mostly useful to protect against updating a nonexistent whiteboard model
@@ -919,20 +1011,20 @@ Mat paolMat::updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo
         throw std::invalid_argument("updateBack3: Attempted to update a whiteboard model with missing data.");
     }
 
-    Mat ret = oldWboardModel.clone();
+    Mat updatedModel = oldWboardModel.clone();
 
     //for every pixel in the image
-    for (int y = 0; y < ret.rows; y++) {
-        for (int x = 0; x < ret.cols; x++) {
+    for (int y = 0; y < updatedModel.rows; y++) {
+        for (int x = 0; x < updatedModel.cols; x++) {
             //if there was no movement at that pixel
             if (mvmtInfo.at<Vec3b>(y,x)[0] == 0) {
                 //update the whiteboard model at that pixel
                 for (int c=0;c<3;c++){
-                    ret.at<Vec3b>(y,x)[c]=newInfo.at<Vec3b>(y,x)[c];
+                    updatedModel.at<Vec3b>(y,x)[c]=newInfo.at<Vec3b>(y,x)[c];
                 }
             }
         }
     }
 
-    return ret;
+    return updatedModel;
 }
