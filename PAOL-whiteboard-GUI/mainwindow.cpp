@@ -67,8 +67,8 @@ void MainWindow::processWhiteboard(){
         displayMat(oldFrame, *ui->imDisplay1);
         displayMat(currentFrame, *ui->imDisplay2);
 
-//        Mat markerLocation = paolMat::findMarkerWithCC(currentFrame);
-        Mat markerLocation = paolMat::findMarkerWithMarkerBorders(currentFrame);
+        Mat markerLocation = paolMat::findMarkerWithCC(currentFrame);
+//        Mat markerLocation = paolMat::findMarkerWithMarkerBorders(currentFrame);
         Mat darkenedText = paolMat::whitenWhiteboard(currentFrame, markerLocation);
         displayMat(markerLocation, *ui->imDisplay3);
 

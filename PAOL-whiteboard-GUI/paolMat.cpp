@@ -1,10 +1,7 @@
 #include "paolMat.h"
 #include "uf.h"
-#include <map>
-#include <typeinfo>
-#include <iostream>
+#include "clock.h"
 #include <stdexcept>
-#include <set>
 
 paolMat::~paolMat()
 {
@@ -639,7 +636,7 @@ int** paolMat::getConnectedComponents(const Mat& components) {
     }
 
     // The disjoint set structure that keeps track of component classes
-    UF compClasses;
+    UF compClasses(DEFAULT_NUM_CC);
     // Counter for the components in the image
     int regCounter = 1;
     for(int i = 0; i < components.rows; i++) {
@@ -652,13 +649,11 @@ int** paolMat::getConnectedComponents(const Mat& components) {
                     if(j-1 < 0) {
                         // This is the TL pixel, so set as new class
                         componentLabels[i][j] = regCounter;
-                        compClasses.addClass(regCounter);
                         regCounter++;
                     }
                     else if(componentLabels[i][j-1] == -1) {
                         // No left neighbor, so set pixel as new class
                         componentLabels[i][j] = regCounter;
-                        compClasses.addClass(regCounter);
                         regCounter++;
                     }
                     else {
@@ -672,7 +667,6 @@ int** paolMat::getConnectedComponents(const Mat& components) {
                         if(componentLabels[i-1][j] == -1) {
                             // No top neighbor, so set pixel as new class
                             componentLabels[i][j] = regCounter;
-                            compClasses.addClass(regCounter);
                             regCounter++;
                         }
                         else {
@@ -687,7 +681,6 @@ int** paolMat::getConnectedComponents(const Mat& components) {
                         if(topClass == -1 && leftClass == -1) {
                             // No neighbor exists, so set pixel as new class
                             componentLabels[i][j] = regCounter;
-                            compClasses.addClass(regCounter);
                             regCounter++;
                         }
                         else if(topClass == -1 && leftClass != -1) {
@@ -723,7 +716,6 @@ int** paolMat::getConnectedComponents(const Mat& components) {
             componentLabels[i][j] = compClasses.find(componentLabels[i][j]);
         }
     }
-
     return componentLabels;
 }
 
@@ -736,14 +728,18 @@ Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompL
     // Get the component labels
     int** components = getConnectedComponents(compsImg);
 
-    // Keep track of components that overlap with keepCompLocs
-    std::set<int> componentsToKeep;
+    // Initialize lookup table of components to keep (initially keep no components)
+    vector<bool> componentsToKeep(DEFAULT_NUM_CC, false);
     for(int i=0; i < keepCompLocs.rows; i++) {
         for(int j=0; j < keepCompLocs.cols; j++) {
-            // Save the label of the component if the keepCompLocs pixel is white
-            // and there is a connected component at that location
+            // If there is a component at the pixel and the pixel from keepCompLocs is
+            // white, then keep the component
             if(keepCompLocs.at<Vec3b>(i,j)[2] == 255 && components[i][j] > 0) {
-                componentsToKeep.insert(components[i][j]);
+                unsigned int compLabel = components[i][j];
+                // Resize the lookup table if it cannot contain the found comp label
+                if(compLabel >= componentsToKeep.size())
+                    componentsToKeep.resize(2*compLabel, false);
+                componentsToKeep[compLabel] = true;
             }
         }
     }
@@ -752,9 +748,9 @@ Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompL
     Mat filteredComps = Mat::zeros(compsImg.size(), compsImg.type());
     for(int i=0; i < keepCompLocs.rows; i++) {
         for(int j=0; j < keepCompLocs.cols; j++) {
-            // If the component is labeled and it was one of the kept components, add
-            // the pixels of the component to filteredComps
-            if(components[i][j] != -1 && componentsToKeep.find(components[i][j]) != componentsToKeep.end()) {
+            // If the pixel is part of a kept component, add it to the output
+            int compLabel = components[i][j];
+            if(compLabel > 0 && componentsToKeep[compLabel]) {
                 filteredComps.at<Vec3b>(i,j)[0] = 255;
                 filteredComps.at<Vec3b>(i,j)[1] = 255;
                 filteredComps.at<Vec3b>(i,j)[2] = 255;
@@ -775,11 +771,13 @@ Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompL
 // First, find the DoG edges and threshold them. Then, use pDrift to determine
 // which connected components from the threholded DoG edges should be kept.
 Mat paolMat::findMarkerWithCC(const Mat& orig) {
+    Clock clock;
     Mat markerCandidates = getDoGEdges(orig, 13, 17, 1);
     markerCandidates = adjustLevels(markerCandidates, 0, 4, 1);
     markerCandidates = binarize(markerCandidates, 10);
     Mat markerLocations = pDrift(orig);
     markerLocations = binarize(markerLocations, 10);
+    qDebug("Found marker strokes in %d ms", clock.getElapsedTime());
     return filterConnectedComponents(markerCandidates, markerLocations);
 }
 

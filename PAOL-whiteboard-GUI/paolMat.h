@@ -1,33 +1,11 @@
 #ifndef PAOLMAT_H
 #define PAOLMAT_H
 
-//Including C++ Libs
-#include "opencv2/highgui/highgui_c.h"
-#include "opencv2/imgproc/imgproc_c.h"
-
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <QLabel>
-#include <QMainWindow>
-#include <QtCore>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <cstring>
-#include <QString>
-
-#include <vector>
 #include <QFileDialog>
-
-/*
-#include <iostream>
-#include <iterator>
-#include <queue>
-#include <algorithm>
-#include <cstdio>
-#include <ctime>
-*/
 
 using namespace cv;
 
@@ -40,6 +18,8 @@ private:
     static const int SCALE = 8;
     // How many frames to search for in data set if the next frame is missing
     static const int TIME_SKIP_LIMIT = 300;
+    // Expected upper bound on how many connected components are found in a DoG image
+    static const int DEFAULT_NUM_CC = 50000;
 
     /// Webcam object
     VideoCapture cam;
