@@ -15,11 +15,13 @@ TEMPLATE = app
 SOURCES += main.cpp\
         mainwindow.cpp \
     paolMat.cpp \
-    uf.cpp
+    uf.cpp \
+    clock.cpp
 
 HEADERS  += mainwindow.h \
     paolMat.h \
-    uf.h
+    uf.h \
+    clock.h
 
 FORMS    += mainwindow.ui
 
