@@ -16,8 +16,10 @@ private:
     /// Constants
     // Scaling factor for processing on smaller versions of whiteboard
     static const int SCALE = 8;
-    // How many frames to search for in data set if the next frame is missing
+    // Maximum number of seconds to skip in data set if the next frame is missing
     static const int TIME_SKIP_LIMIT = 300;
+    // Maximum number of indices to skip in data set if the next frame is missing
+    static const int INDEX_SKIP_LIMIT = 300;
     // Expected upper bound on how many connected components are found in a DoG image
     static const int DEFAULT_NUM_CC = 50000;
 

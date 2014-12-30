@@ -94,23 +94,25 @@ bool paolMat::readNextInDataSet(Mat& destination) {
     char nextFrameLoc[256];
     Mat temp;
 
-    // Search for next image up to TIME_SKIP_LIMIT times
-    for(int searchCount = 0; searchCount < TIME_SKIP_LIMIT; searchCount++) {
-        // Set the index and time to look for
-        int tempFrameIndex = nextFrameIndex + searchCount;
-        int tempFrameTime = nextFrameTime + searchCount;
+    // Set the next index to search for up to INDEX_SKIP_LIMIT times
+    for(int indexSkipCount = 0; indexSkipCount < INDEX_SKIP_LIMIT; indexSkipCount++) {
+        int tempFrameIndex = nextFrameIndex + indexSkipCount;
+        // Set the next timestamp to search for up to TIME_SKIP_LIMIT times
+        for(int timeSkipCount = 0; timeSkipCount < TIME_SKIP_LIMIT; timeSkipCount++) {
+            int tempFrameTime = nextFrameTime + timeSkipCount;
 
-        // Attempt to read the file with the temp frame index and time
-        sprintf(nextFrameLoc, "%s/cameraIn%06d-%10d-%d.png", dataSetDir.c_str(), tempFrameIndex, tempFrameTime, datasetCamNum);
-        temp = imread(nextFrameLoc, CV_LOAD_IMAGE_COLOR);
+            // Attempt to read the file with the temp frame index and time
+            sprintf(nextFrameLoc, "%s/cameraIn%06d-%10d-%d.png", dataSetDir.c_str(), tempFrameIndex, tempFrameTime, datasetCamNum);
+            temp = imread(nextFrameLoc, CV_LOAD_IMAGE_COLOR);
 
-        // Update destination, next frame index and time if read was successful
-        if(temp.data) {
-            qDebug("Successfully read %s", nextFrameLoc);
-            destination = temp.clone();
-            nextFrameIndex = tempFrameIndex + 1;
-            nextFrameTime = tempFrameTime + 1;
-            return true;
+            // Update destination, next frame index and time if read was successful
+            if(temp.data) {
+                qDebug("Successfully read %s", nextFrameLoc);
+                destination = temp.clone();
+                nextFrameIndex = tempFrameIndex + 1;
+                nextFrameTime = tempFrameTime + 1;
+                return true;
+            }
         }
     }
     qDebug("Failed to find the next file.");
