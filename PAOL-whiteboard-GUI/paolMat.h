@@ -67,7 +67,7 @@ public:
     /// Methods to read images from file or webcam
     bool initWebcam(int inputNum);
     bool takePictureFromWebcam(Mat& destination, int &frameTime, int &deviceNum);
-    bool initDataSetReadProps(QString firstImageLoc);
+    bool initDataSetReadProps(string firstImagePath);
     bool readNextInDataSet(Mat& destination, int &frameTime, int &deviceNum);
 
     /// Methods to find and process differences (ie. find the lecturer)

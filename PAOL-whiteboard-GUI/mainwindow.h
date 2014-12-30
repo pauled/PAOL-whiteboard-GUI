@@ -55,7 +55,7 @@ private:
     Mat whiteboardModel;
 
     // Methods to request user input
-    QString promptFirstDataSetImage();
+    string promptFirstDataSetImage();
     int promptWebcamNumber();
 
     // Methods to convert and display Mats to the GUI

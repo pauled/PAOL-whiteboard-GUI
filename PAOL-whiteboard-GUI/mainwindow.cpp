@@ -184,7 +184,7 @@ void MainWindow::on_loadDataSet_clicked()
     cam=new paolMat();
 
     // Prompt the user for a file and attempt to initialize the data set to read
-    QString fileLoc = promptFirstDataSetImage();
+    string fileLoc = promptFirstDataSetImage();
     bool initWasSuccessful = cam->initDataSetReadProps(fileLoc);
 
     if(initWasSuccessful) {
@@ -208,10 +208,11 @@ void MainWindow::on_pause_clicked()
 }
 
 // Opens a dialog box to let the user choose the first image in a data set
-QString MainWindow::promptFirstDataSetImage() {
+string MainWindow::promptFirstDataSetImage() {
     // tr is a method from QObject which facilitates localization
-    return QFileDialog::getOpenFileName(this, tr("Open First Image of Sequence"),".",
+    QString s = QFileDialog::getOpenFileName(this, tr("Open First Image of Sequence"),".",
                                         tr("Image Files (*.png *.bmp *.jpg *.JPG)"));
+    return s.toStdString();
 }
 
 // Opens an input box to let the user choose the camera. Returns -1 if the user did not press "OK".

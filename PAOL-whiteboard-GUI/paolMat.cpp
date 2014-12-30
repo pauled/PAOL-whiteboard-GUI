@@ -73,22 +73,20 @@ bool paolMat::takePictureFromWebcam(Mat& destination, int& frameTime, int& devic
 // Given the path of the first image in a data set, set the fields to enable
 // iterating through the data set
 // Return true if the fields were set correctly, false otherwise
-bool paolMat::initDataSetReadProps(QString firstImageLoc) {
+bool paolMat::initDataSetReadProps(string firstImagePath) {
     // Handle case where the given path is empty
-    if(firstImageLoc.length() == 0) {
+    if(firstImagePath.length() == 0) {
         qWarning("initDataSetReadProps: The given file path was empty.");
         return false;
     }
 
-    // Convert firstImageLoc to std::string
-    string locAsStdString = firstImageLoc.toStdString();
     // Get the data set directory by cutting off whatever is after the last "/"
-    dataSetDir = locAsStdString.substr(0, locAsStdString.find_last_of("/"));
+    dataSetDir = firstImagePath.substr(0, firstImagePath.find_last_of("/"));
 
     // Parse file name and get time and index of the next frame to read (ie. of the given image)
     // Set format of the first image location and use it to scan for next frame index and time
     string scanFormat = dataSetDir + "/cameraIn%06d-%10d-%d.png";
-    int scanResult = sscanf(locAsStdString.c_str(), scanFormat.c_str(), &nextFrameIndex, &nextFrameTime, &datasetCamNum);
+    int scanResult = sscanf(firstImagePath.c_str(), scanFormat.c_str(), &nextFrameIndex, &nextFrameTime, &datasetCamNum);
 
     // sscanf should have found three arguments
     if(scanResult == 3) {
