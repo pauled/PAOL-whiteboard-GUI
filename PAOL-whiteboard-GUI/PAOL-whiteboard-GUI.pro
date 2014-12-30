@@ -16,12 +16,17 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     paolMat.cpp \
     uf.cpp \
-    clock.cpp
+    clock.cpp \
+    webcamimagescanner.cpp \
+    datasetimagescanner.cpp
 
 HEADERS  += mainwindow.h \
     paolMat.h \
     uf.h \
-    clock.h
+    clock.h \
+    ImageScanner.h \
+    webcamimagescanner.h \
+    datasetimagescanner.h
 
 FORMS    += mainwindow.ui
 

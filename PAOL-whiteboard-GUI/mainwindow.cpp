@@ -1,5 +1,9 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "ImageScanner.h"
+#include "webcamimagescanner.h"
+#include "datasetimagescanner.h"
+#include <stdexcept>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -21,10 +25,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->imDisplay12->setScaledContents(true);
 
     runCam=false;
-    runData=false;
     pause=false;
 
-    cam=new paolMat();
+    scanner = NULL;
 
     count=0;
 
@@ -118,24 +121,15 @@ void MainWindow::processWhiteboard(){
 }
 
 void MainWindow::displayFrame() {
-    if(!pause && (runCam || runData)){
-
+    if(!pause && runCam){
         // Set the previous frame
         oldFrame = currentFrame.clone();
 
         // Take a picture if the webcam is running
         if(runCam){
-            if(!cam->takePictureFromWebcam(currentFrame, lastProcessedFrameTime, deviceNum)) {
+            if(!scanner->getNextImage(currentFrame, lastProcessedFrameTime, deviceNum)) {
                 qWarning("Stopped processing. Please choose a new file or restart the camera.");
                 runCam = false;
-            }
-        }
-
-        // Read the next picture in the data set if processing a data set
-        if(runData){
-            if(!cam->readNextInDataSet(currentFrame, lastProcessedFrameTime, deviceNum)) {
-                qWarning("Stopped processing. Please choose a new file or restart the camera.");
-                runData=false;
             }
         }
 
@@ -148,19 +142,15 @@ void MainWindow::on_camera_clicked()
 {
     // Stop processing
     runCam=false;
-    runData=false;
+    // Clear the old scanner object
+    delete scanner;
 
-    // Clear the cam object
-    cam->~paolMat();
-    cam=new paolMat();
+    try {
+        // Initialize scanner
+        scanner = new WebcamImageScanner(promptWebcamNumber());
 
-    // Prompt the user for the webcam number and initialize the webcam
-    int webcamNum = promptWebcamNumber();
-    bool initWebcamWasSuccessful = cam->initWebcam(webcamNum);
-
-    if(initWebcamWasSuccessful) {
         // Initialize whiteboard frames
-        cam->takePictureFromWebcam(currentFrame, lastProcessedFrameTime, deviceNum);
+        scanner->getNextImage(currentFrame, lastProcessedFrameTime, deviceNum);
         whiteboardModel = Mat();
         oldFrame = Mat();
 
@@ -168,8 +158,12 @@ void MainWindow::on_camera_clicked()
         runCam = true;
         pause = false;
     }
-    else {
-        qWarning("Failed to initialize webcam. Please select a new webcam or file.");
+    catch(std::invalid_argument e) {
+        qWarning(e.what());
+        qWarning("Failed to initialize webcam. Please choose another webcam or data set.");
+        // NOTE: Not including the below line causes a segmentation fault the next time
+        // scanner gets deleted. Are there potential memory leaks with this solution?
+        scanner = NULL;
     }
 }
 
@@ -177,28 +171,28 @@ void MainWindow::on_loadDataSet_clicked()
 {
     // Stop processing
     runCam=false;
-    runData=false;
+    // Clear the old scanner object
+    delete scanner;
 
-    // Clear the cam object
-    cam->~paolMat();
-    cam=new paolMat();
+    try {
+        // Initialize scanner
+        scanner = new DatasetImageScanner(promptFirstDataSetImage());
 
-    // Prompt the user for a file and attempt to initialize the data set to read
-    string fileLoc = promptFirstDataSetImage();
-    bool initWasSuccessful = cam->initDataSetReadProps(fileLoc);
-
-    if(initWasSuccessful) {
         // Initialize whiteboard frames
-        cam->readNextInDataSet(currentFrame, lastProcessedFrameTime, deviceNum);
+        scanner->getNextImage(currentFrame, lastProcessedFrameTime, deviceNum);
         whiteboardModel = Mat();
         oldFrame = Mat();
 
         // Start processing whiteboard
-        runData=true;
-        pause=false;
+        runCam = true;
+        pause = false;
     }
-    else {
-        qWarning("Failed to initialize data set properties. Please select a new file or webcam.");
+    catch(std::invalid_argument e) {
+        qWarning(e.what());
+        qWarning("Failed to initialize data set. Please choose another webcam or data set.");
+        // NOTE: Not including the below line causes a segmentation fault the next time
+        // scanner gets deleted. Are there potential memory leaks with this solution?
+        scanner = NULL;
     }
 }
 

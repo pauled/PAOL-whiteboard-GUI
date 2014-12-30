@@ -5,6 +5,8 @@
 #include <QTimer>
 #include <QInputDialog>
 #include "paolMat.h"
+#include "ImageScanner.h"
+#include "webcamimagescanner.h"
 
 namespace Ui {
 class MainWindow;
@@ -35,11 +37,10 @@ private:
 
     // Flags to run the GUI
     bool runCam;
-    bool runData;
     bool pause;
 
     // Object to read from data set or webcam
-    paolMat *cam;
+    ImageScanner* scanner;
 
     // Count for storing how many consecutive frames are similar
     int count;

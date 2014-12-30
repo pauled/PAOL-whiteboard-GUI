@@ -12,31 +12,11 @@ using namespace cv;
 class paolMat
 {
 private:
-
     /// Constants
     // Scaling factor for processing on smaller versions of whiteboard
     static const int SCALE = 8;
-    // Maximum number of seconds to skip in data set if the next frame is missing
-    static const int TIME_SKIP_LIMIT = 300;
-    // Maximum number of indices to skip in data set if the next frame is missing
-    static const int INDEX_SKIP_LIMIT = 300;
     // Expected upper bound on how many connected components are found in a DoG image
     static const int DEFAULT_NUM_CC = 50000;
-
-    /// Webcam object
-    VideoCapture cam;
-    int webcamNum;
-
-    /// Image read variables
-    // The location of the data set
-    string dataSetDir;
-    // The index of the next frame to read
-    // (ie. ## from cameraIn##)
-    int nextFrameIndex;
-    // The timestamp of the next frame to read
-    int nextFrameTime;
-    // The data set camera number
-    int datasetCamNum;
 
     // Utility methods
     /// Methods to find and process differences (ie. find the lecturer)
@@ -62,14 +42,6 @@ private:
 
 
 public:
-    ~paolMat();
-
-    /// Methods to read images from file or webcam
-    bool initWebcam(int inputNum);
-    bool takePictureFromWebcam(Mat& destination, int &frameTime, int &deviceNum);
-    bool initDataSetReadProps(string firstImagePath);
-    bool readNextInDataSet(Mat& destination, int &frameTime, int &deviceNum);
-
     /// Methods to find and process differences (ie. find the lecturer)
     static void findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size);
     static void filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat& origDiffs);
