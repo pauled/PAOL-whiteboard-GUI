@@ -96,9 +96,16 @@ void MainWindow::processWhiteboard(){
         whiteboardModel = newWboardModel.clone();
         displayMat(newWboardModel, *ui->imDisplay5);
 
+        //////////////////////////////////////////////////////////
+
         // Rectify the model
         Mat rectified = paolMat::rectifyImage(newWboardModel);
         displayMat(rectified, *ui->imDisplay6);
+
+        // Save to disk
+        char imageName[256];
+        sprintf(imageName, "/home/paol/shared/out/whiteBoard%d-%d.png", lastProcessedFrameTime, deviceNum);
+        imwrite(string(imageName), whiteboardModel);
 
         //////////////////////////////////////////////////
 
@@ -118,7 +125,7 @@ void MainWindow::displayFrame() {
 
         // Take a picture if the webcam is running
         if(runCam){
-            if(!cam->takePictureFromWebcam(currentFrame)) {
+            if(!cam->takePictureFromWebcam(currentFrame, lastProcessedFrameTime, deviceNum)) {
                 qWarning("Stopped processing. Please choose a new file or restart the camera.");
                 runCam = false;
             }
@@ -126,7 +133,7 @@ void MainWindow::displayFrame() {
 
         // Read the next picture in the data set if processing a data set
         if(runData){
-            if(!cam->readNextInDataSet(currentFrame)) {
+            if(!cam->readNextInDataSet(currentFrame, lastProcessedFrameTime, deviceNum)) {
                 qWarning("Stopped processing. Please choose a new file or restart the camera.");
                 runData=false;
             }
@@ -153,7 +160,7 @@ void MainWindow::on_camera_clicked()
 
     if(initWebcamWasSuccessful) {
         // Initialize whiteboard frames
-        cam->takePictureFromWebcam(currentFrame);
+        cam->takePictureFromWebcam(currentFrame, lastProcessedFrameTime, deviceNum);
         whiteboardModel = Mat();
         oldFrame = Mat();
 
@@ -182,7 +189,7 @@ void MainWindow::on_loadDataSet_clicked()
 
     if(initWasSuccessful) {
         // Initialize whiteboard frames
-        cam->readNextInDataSet(currentFrame);
+        cam->readNextInDataSet(currentFrame, lastProcessedFrameTime, deviceNum);
         whiteboardModel = Mat();
         oldFrame = Mat();
 

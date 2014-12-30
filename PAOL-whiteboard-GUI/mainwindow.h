@@ -44,6 +44,11 @@ private:
     // Count for storing how many consecutive frames are similar
     int count;
 
+    // Timestamp of the last frame that was processed
+    int lastProcessedFrameTime;
+    // Device number of the frames to process (used to save processed images)
+    int deviceNum;
+
     // Objects to store the frames to process, as well as what the whiteboard looks like
     Mat currentFrame;
     Mat oldFrame;

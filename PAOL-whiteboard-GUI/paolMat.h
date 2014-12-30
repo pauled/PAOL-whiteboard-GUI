@@ -25,6 +25,7 @@ private:
 
     /// Webcam object
     VideoCapture cam;
+    int webcamNum;
 
     /// Image read variables
     // The location of the data set
@@ -64,10 +65,10 @@ public:
     ~paolMat();
 
     /// Methods to read images from file or webcam
-    bool initWebcam(int deviceNum);
-    bool takePictureFromWebcam(Mat& destination);
+    bool initWebcam(int inputNum);
+    bool takePictureFromWebcam(Mat& destination, int &frameTime, int &deviceNum);
     bool initDataSetReadProps(QString firstImageLoc);
-    bool readNextInDataSet(Mat& destination);
+    bool readNextInDataSet(Mat& destination, int &frameTime, int &deviceNum);
 
     /// Methods to find and process differences (ie. find the lecturer)
     static void findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size);

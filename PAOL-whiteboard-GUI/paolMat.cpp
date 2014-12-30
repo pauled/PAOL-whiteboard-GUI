@@ -17,19 +17,22 @@ paolMat::~paolMat()
 
 // Set the webcam to get frames from
 // Return true if the webcam is opened, false if it is not opened or the device number is invalid
-bool paolMat::initWebcam(int deviceNum) {
+bool paolMat::initWebcam(int inputNum) {
     // Reject negative input values
-    if(deviceNum < 0) {
-        qWarning("setCameraNum2: Attempted to open with an invalid webcam number %d.", deviceNum);
+    if(inputNum < 0) {
+        qWarning("setCameraNum2: Attempted to open with an invalid webcam number %d.", inputNum);
         return false;
     }
 
     // Initialize the camera and check if it is valid
-    cam = VideoCapture(deviceNum);
+    cam = VideoCapture(inputNum);
     if(!cam.isOpened()) {
-        qWarning("setCameraNum2: Failed to open /dev/video%d.", deviceNum);
+        qWarning("setCameraNum2: Failed to open /dev/video%d.", inputNum);
         return false;
     }
+
+    // Set webcam number
+    webcamNum = inputNum;
 
     //set parameters for camera
     cam.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
@@ -40,15 +43,25 @@ bool paolMat::initWebcam(int deviceNum) {
 
 // Grab a frame from the webcam and save it to the destination
 // Return true if a frame was successfully read from the webcam, false otherwise
-bool paolMat::takePictureFromWebcam(Mat& destination) {
+bool paolMat::takePictureFromWebcam(Mat& destination, int& frameTime, int& deviceNum) {
     Mat temp;
     //grab 5 consecutive images to clear camera buffer
     for (int i = 0; i < 5;i++) {
         cam >> temp;
     }
     if(temp.data) {
-        qDebug("Successfully took a webcam picture.");
+        // Set device number
+        deviceNum = webcamNum;
+
+        // Set current frame time
+        time_t curTime;
+        time(&curTime);
+        frameTime = (int)curTime;
+
+        // Copy image to destination
         destination = temp.clone();
+
+        qDebug("Successfully took a webcam picture.");
         return true;
     }
     else {
@@ -89,7 +102,7 @@ bool paolMat::initDataSetReadProps(QString firstImageLoc) {
 
 // Read the next frame and save it to the destination
 // Return true if the read was a success, false otherwise
-bool paolMat::readNextInDataSet(Mat& destination) {
+bool paolMat::readNextInDataSet(Mat& destination, int &frameTime, int &deviceNum) {
     // Attempt to read the next file using the stored time and index of the next frame
     char nextFrameLoc[256];
     Mat temp;
@@ -107,10 +120,18 @@ bool paolMat::readNextInDataSet(Mat& destination) {
 
             // Update destination, next frame index and time if read was successful
             if(temp.data) {
-                qDebug("Successfully read %s", nextFrameLoc);
+                // Save frame time and device number
+                frameTime = tempFrameTime;
+                deviceNum = datasetCamNum;
+
+                // Save image
                 destination = temp.clone();
+
+                // Update next frame time and index
                 nextFrameIndex = tempFrameIndex + 1;
                 nextFrameTime = tempFrameTime + 1;
+
+                qDebug("Successfully read %s", nextFrameLoc);
                 return true;
             }
         }
