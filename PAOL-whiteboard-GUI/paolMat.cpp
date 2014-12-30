@@ -1,7 +1,116 @@
 #include "paolMat.h"
 #include "uf.h"
-#include "clock.h"
 #include <stdexcept>
+
+///////////////////////////////////////////////////////////////////
+///
+///   Definitions for constructing and restoring original state
+///   of the whiteboard processor
+///
+///////////////////////////////////////////////////////////////////
+
+// Constructor
+paolMat::paolMat() {
+    reset();
+}
+
+// Return the whiteboard processor to its original state (ie. no processed frames or whiteboard model)
+void paolMat::reset() {
+    stableImageCount = 0;
+    oldFrame = Mat();
+    whiteboardModel = Mat();
+}
+
+///////////////////////////////////////////////////////////////////
+///
+///   Method to process the given frame and update whiteboard model
+///
+///////////////////////////////////////////////////////////////////
+
+// Processes the given frame and updates the whiteboard model.
+void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput) {
+    // Clear out the frames to output
+    frameOutput.clear();
+    // Stores the images that we eventually want to copy to frameOutput
+    vector<Mat> toSave;
+
+    // Initialize oldFrame if we have not processed a frame before
+    if(!oldFrame.data) {
+        // Duplicate the current frame
+        oldFrame = currentFrame.clone();
+        return;
+    }
+
+    // Find difference pixels
+    float numDif;
+    Mat allDiffs;
+    paolMat::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
+
+    // Temporary Mat to store true differences
+    Mat filteredDiffs = Mat::zeros(allDiffs.size(), allDiffs.type());
+
+    //if there is enough of a difference between the two images
+    float refinedNumDif = 0;
+    if(numDif>.03){
+        paolMat::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
+        stableImageCount=0;
+    }
+
+    //if the images are really identical, count the number of consecultive nearly identical images
+    if (numDif < .000001)
+        stableImageCount++;
+
+    //if the differences are enough that we know where the lecturer is or the images have been identical
+    //for two frames, and hence no lecturer present
+    if(refinedNumDif>.04 || (numDif <.000001 && stableImageCount==2)){
+
+        /////////////////////////////////////////////////////////////
+        // Display the old and current frames being processed
+        Mat markerLocation = paolMat::findMarkerWithCC(currentFrame);
+//        Mat markerLocation = paolMat::findMarkerWithMarkerBorders(currentFrame);
+        Mat darkenedText = paolMat::whitenWhiteboard(currentFrame, markerLocation);
+
+        /////////////////////////////////////////////////////////////
+        //identify where motion is
+
+        Mat diffHulls = paolMat::expandDifferencesRegion(filteredDiffs);
+        Mat diffHullsFullSize = paolMat::enlarge(diffHulls);
+
+        ////////////////////////////////////////////////////////////////////////////////
+
+        // Update background image (whiteboard model)
+        if(!whiteboardModel.data) {
+            // There is no previous whiteboard model, so set it to the enhanced image
+            whiteboardModel = darkenedText;
+        }
+        else {
+            // Update the existing whiteboard model
+            whiteboardModel = paolMat::updateWhiteboardModel(whiteboardModel, darkenedText, diffHullsFullSize);
+        }
+        toSave.push_back(whiteboardModel);
+
+        // Update old frame
+        oldFrame = currentFrame.clone();
+
+        //////////////////////////////////////////////////////////
+
+        // Rectify the model
+        Mat rectified = paolMat::rectifyImage(whiteboardModel);
+
+        // Push images to save to frameOutput
+        for(unsigned int i = 0; i < toSave.size(); i++) {
+            frameOutput.push_back(toSave[i].clone());
+        }
+
+        //////////////////////////////////////////////////
+
+        // TODO: figure out if saves need to be made based on detected marker
+        // Strategy:
+        // Store a marker model
+        // Make updated version of marker model
+        // If updated version greatly differs from previous version, save whiteboard model
+    }
+}
 
 ///////////////////////////////////////////////////////////////////
 ///
@@ -657,13 +766,11 @@ Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompL
 // First, find the DoG edges and threshold them. Then, use pDrift to determine
 // which connected components from the threholded DoG edges should be kept.
 Mat paolMat::findMarkerWithCC(const Mat& orig) {
-    Clock clock;
     Mat markerCandidates = getDoGEdges(orig, 13, 17, 1);
     markerCandidates = adjustLevels(markerCandidates, 0, 4, 1);
     markerCandidates = binarize(markerCandidates, 10);
     Mat markerLocations = pDrift(orig);
     markerLocations = binarize(markerLocations, 10);
-    qDebug("Found marker strokes in %d ms", clock.getElapsedTime());
     return filterConnectedComponents(markerCandidates, markerLocations);
 }
 

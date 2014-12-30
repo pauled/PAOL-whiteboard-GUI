@@ -19,7 +19,6 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
-    void processWhiteboard();
 
 private slots:
     void displayFrame();
@@ -42,26 +41,19 @@ private:
     // Object to read from data set or webcam
     ImageScanner* scanner;
 
-    // Count for storing how many consecutive frames are similar
-    int count;
-
-    // Timestamp of the last frame that was processed
-    int lastProcessedFrameTime;
-    // Device number of the frames to process (used to save processed images)
-    int deviceNum;
-
-    // Objects to store the frames to process, as well as what the whiteboard looks like
-    Mat currentFrame;
-    Mat oldFrame;
-    Mat whiteboardModel;
+    // Object to process whiteboard
+    paolMat* wbProcessor;
 
     // Methods to request user input
     string promptFirstDataSetImage();
     int promptWebcamNumber();
 
     // Methods to convert and display Mats to the GUI
-    QImage convertMatToQImage(const Mat& mask);
+    QImage convertMatToQImage(const Mat& mat);
     void displayMat(const Mat& mat, QLabel &location);
+
+    // Method to save images
+    void saveWhiteboardImage(const Mat& frame, int &frameTime, int &deviceNum);
 };
 
 #endif // MAINWINDOW_H
