@@ -4,9 +4,9 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QInputDialog>
-#include "paolMat.h"
+#include "WhiteboardProcessor.h"
 #include "ImageScanner.h"
-#include "webcamimagescanner.h"
+#include "ImageProcessor.h"
 
 namespace Ui {
 class MainWindow;
@@ -42,7 +42,7 @@ private:
     ImageScanner* scanner;
 
     // Object to process whiteboard
-    paolMat* wbProcessor;
+    ImageProcessor* wbProcessor;
 
     // Methods to request user input
     string promptFirstDataSetImage();

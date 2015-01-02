@@ -14,19 +14,20 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    paolMat.cpp \
     uf.cpp \
     clock.cpp \
     webcamimagescanner.cpp \
-    datasetimagescanner.cpp
+    datasetimagescanner.cpp \
+    WhiteboardProcessor.cpp
 
 HEADERS  += mainwindow.h \
-    paolMat.h \
     uf.h \
     clock.h \
     ImageScanner.h \
     webcamimagescanner.h \
-    datasetimagescanner.h
+    datasetimagescanner.h \
+    ImageProcessor.h \
+    WhiteboardProcessor.h
 
 FORMS    += mainwindow.ui
 

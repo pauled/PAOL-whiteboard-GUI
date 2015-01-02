@@ -29,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent) :
     pause=false;
 
     scanner = NULL;
-    wbProcessor = new paolMat();
+    wbProcessor = new WhiteboardProcessor();
 
     qTimer = new QTimer(this);
     connect(qTimer, SIGNAL(timeout()), this, SLOT(displayFrame()));

@@ -1,4 +1,4 @@
-#include "paolMat.h"
+#include "WhiteboardProcessor.h"
 #include "uf.h"
 #include <stdexcept>
 
@@ -10,12 +10,12 @@
 ///////////////////////////////////////////////////////////////////
 
 // Constructor
-paolMat::paolMat() {
+WhiteboardProcessor::WhiteboardProcessor() {
     reset();
 }
 
 // Return the whiteboard processor to its original state (ie. no processed frames or whiteboard model)
-void paolMat::reset() {
+void WhiteboardProcessor::reset() {
     stableImageCount = 0;
     oldFrame = Mat();
     whiteboardModel = Mat();
@@ -28,7 +28,7 @@ void paolMat::reset() {
 ///////////////////////////////////////////////////////////////////
 
 // Processes the given frame and updates the whiteboard model.
-void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput) {
+void WhiteboardProcessor::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput) {
     // Clear out the frames to output
     frameOutput.clear();
     // Stores the images that we eventually want to copy to frameOutput
@@ -44,7 +44,7 @@ void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput)
     // Find difference pixels
     float numDif;
     Mat allDiffs;
-    paolMat::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
+    WhiteboardProcessor::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
 
     // Temporary Mat to store true differences
     Mat filteredDiffs = Mat::zeros(allDiffs.size(), allDiffs.type());
@@ -52,7 +52,7 @@ void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput)
     //if there is enough of a difference between the two images
     float refinedNumDif = 0;
     if(numDif>.03){
-        paolMat::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
+        WhiteboardProcessor::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
         stableImageCount=0;
     }
 
@@ -66,15 +66,15 @@ void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput)
 
         /////////////////////////////////////////////////////////////
         // Display the old and current frames being processed
-        Mat markerLocation = paolMat::findMarkerWithCC(currentFrame);
-//        Mat markerLocation = paolMat::findMarkerWithMarkerBorders(currentFrame);
-        Mat darkenedText = paolMat::whitenWhiteboard(currentFrame, markerLocation);
+        Mat markerLocation = WhiteboardProcessor::findMarkerWithCC(currentFrame);
+//        Mat markerLocation = WhiteboardProcessor::findMarkerWithMarkerBorders(currentFrame);
+        Mat darkenedText = WhiteboardProcessor::whitenWhiteboard(currentFrame, markerLocation);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
 
-        Mat diffHulls = paolMat::expandDifferencesRegion(filteredDiffs);
-        Mat diffHullsFullSize = paolMat::enlarge(diffHulls);
+        Mat diffHulls = WhiteboardProcessor::expandDifferencesRegion(filteredDiffs);
+        Mat diffHullsFullSize = WhiteboardProcessor::enlarge(diffHulls);
 
         ////////////////////////////////////////////////////////////////////////////////
 
@@ -85,7 +85,7 @@ void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput)
         }
         else {
             // Update the existing whiteboard model
-            whiteboardModel = paolMat::updateWhiteboardModel(whiteboardModel, darkenedText, diffHullsFullSize);
+            whiteboardModel = WhiteboardProcessor::updateWhiteboardModel(whiteboardModel, darkenedText, diffHullsFullSize);
         }
         toSave.push_back(whiteboardModel);
 
@@ -95,7 +95,7 @@ void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput)
         //////////////////////////////////////////////////////////
 
         // Rectify the model
-        Mat rectified = paolMat::rectifyImage(whiteboardModel);
+        Mat rectified = WhiteboardProcessor::rectifyImage(whiteboardModel);
 
         // Push images to save to frameOutput
         for(unsigned int i = 0; i < toSave.size(); i++) {
@@ -128,7 +128,7 @@ void paolMat::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput)
 //    newImg: The current (newer) whiteboard image
 //    thresh: How much a channel needs to differ between a pixel to count the pixel as a difference
 //    size: Size of window to use to filter out differences near edges
-void paolMat::findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size) {
+void WhiteboardProcessor::findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat& oldImg, const Mat& newImg, int thresh, int size) {
     int offset;
     bool diff;
     int surroundThresh = 50;
@@ -190,7 +190,7 @@ void paolMat::findAllDiffsMini(Mat& diffLocations, float& percentDiff, const Mat
 //    filteredDiffs: Where to store the pixels that are surrounded by enough difference pixels
 //    percentDiff: Where to store the percentage of white pixels in filteredDiffs
 //    origDiffs: The unfiltered difference pixels (gotten from findAllDiffsMini)
-void paolMat::filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat& origDiffs) {
+void WhiteboardProcessor::filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat& origDiffs) {
     filteredDiffs = Mat::zeros(origDiffs.size(), origDiffs.type());
     int total;
     percentDiff = 0;
@@ -216,7 +216,7 @@ void paolMat::filterNoisyDiffs(Mat& filteredDiffs, float& percentDiff, const Mat
 }
 
 // Given a binary image, fill the image border by replicating the adjacent pixel
-Mat paolMat::replicateToImageBorder(const Mat& orig) {
+Mat WhiteboardProcessor::replicateToImageBorder(const Mat& orig) {
     Mat origWithBorderPixels = orig.clone();
     int x;
 
@@ -241,7 +241,7 @@ Mat paolMat::replicateToImageBorder(const Mat& orig) {
 }
 
 // Sweep the given image (whatever that means), returns a binary image
-Mat paolMat::sweepDown(const Mat& orig){
+Mat WhiteboardProcessor::sweepDown(const Mat& orig){
     bool left,right,top;
     //create a Mat the size of orig to store results
     Mat sweeped=Mat::zeros(orig.size(),orig.type());
@@ -294,7 +294,7 @@ Mat paolMat::sweepDown(const Mat& orig){
 // Arguments:
 //    content: A binary image with white pixels to place the border around
 //    borderSize: The thickness of the border
-Mat paolMat::borderContentWithGreen(const Mat& content, int borderSize)
+Mat WhiteboardProcessor::borderContentWithGreen(const Mat& content, int borderSize)
 {
     Mat ret = content.clone();
     int startx,endx,starty,endy;
@@ -330,7 +330,7 @@ Mat paolMat::borderContentWithGreen(const Mat& content, int borderSize)
 }
 
 // Dilate the given image by the given size
-Mat paolMat::grow(const Mat& orig, int size) {
+Mat WhiteboardProcessor::grow(const Mat& orig, int size) {
     Mat ret = orig.clone();
     Mat element = getStructuringElement(MORPH_RECT, Size(2*size+1,2*size+1));
     dilate(orig, ret, element);
@@ -338,7 +338,7 @@ Mat paolMat::grow(const Mat& orig, int size) {
 }
 
 // Get the contours of the given image
-Mat paolMat::getImageContours(const Mat& orig) {
+Mat WhiteboardProcessor::getImageContours(const Mat& orig) {
     Mat contourImage = orig.clone();
     Mat src_gray;
     int thresh = 100;
@@ -386,8 +386,8 @@ Mat paolMat::getImageContours(const Mat& orig) {
     return contourImage;
 }
 
-// Enlarge the given image by a factor of paolMat::SCALE
-Mat paolMat::enlarge(const Mat& orig) {
+// Enlarge the given image by a factor of WhiteboardProcessor::SCALE
+Mat WhiteboardProcessor::enlarge(const Mat& orig) {
     Mat enlarged = Mat::zeros(Size(orig.cols*SCALE, orig.rows*SCALE), orig.type());
     bool center,right,down,corner;
     bool rightIn,downIn;//,cornerIn;
@@ -455,7 +455,7 @@ Mat paolMat::enlarge(const Mat& orig) {
 
 // Covers the (filtered) difference pixels by first dilating the difference,
 // then drawing a convex hull around the dilation
-Mat paolMat::expandDifferencesRegion(const Mat& differences) {
+Mat WhiteboardProcessor::expandDifferencesRegion(const Mat& differences) {
     // Dilate the difference pixels
     Mat grownDiffs = replicateToImageBorder(differences);
     grownDiffs = sweepDown(grownDiffs);
@@ -478,7 +478,7 @@ Mat paolMat::expandDifferencesRegion(const Mat& differences) {
 
 // Determine the pixels in orig where all the values of all three
 // channels are greater than the threshold
-Mat paolMat::binarize(const Mat& orig, int threshold) {
+Mat WhiteboardProcessor::binarize(const Mat& orig, int threshold) {
     Mat binarized = Mat::zeros(orig.size(), orig.type());
     for(int i = 0; i < orig.rows; i++) {
         for(int j = 0; j < orig.cols; j++) {
@@ -504,7 +504,7 @@ Mat paolMat::binarize(const Mat& orig, int threshold) {
 //    orig: The image to threshold
 //    threshold: The minimum value of the blue channel
 //    size: The width of the image border to ignore
-Mat paolMat::thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size) {
+Mat WhiteboardProcessor::thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size) {
     Mat ret = Mat::zeros(orig.size(), orig.type());
     //for every pixel
     for(int y = size; y < orig.rows - size; y++) {
@@ -525,7 +525,7 @@ Mat paolMat::thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size) {
 // direction is stored in the red channel (for vertical edges), the derivative in the
 // vertical direction is stored in the green channel (for horizontal edges), and the
 // sum is stored in the blue channel
-Mat paolMat::pDrift(const Mat& orig) {
+Mat WhiteboardProcessor::pDrift(const Mat& orig) {
     int temp,total;
     Mat ret = Mat::zeros(orig.size(), orig.type());
 
@@ -571,7 +571,7 @@ Mat paolMat::pDrift(const Mat& orig) {
 }
 
 // Given approximate borders (enclosures) of the marker strokes, fill in the enclosed regions
-Mat paolMat::fillMarkerBorders(const Mat& markerBorders) {
+Mat WhiteboardProcessor::fillMarkerBorders(const Mat& markerBorders) {
     //run a morphological closure (grow then shrink)
     //this will fill in spaces in text caused by only looking at edges
     int dilation_type = MORPH_RECT;
@@ -588,7 +588,7 @@ Mat paolMat::fillMarkerBorders(const Mat& markerBorders) {
 // Locates marker strokes by approximating the borders for the marker strokes, then
 // filling in the enclosed regions. This method is faster than the connected
 // components method, but not as accurate.
-Mat paolMat::findMarkerWithMarkerBorders(const Mat &whiteboardImage) {
+Mat WhiteboardProcessor::findMarkerWithMarkerBorders(const Mat &whiteboardImage) {
     Mat temp = boxBlur(whiteboardImage, 1);
     temp = pDrift(temp);
     temp = thresholdOnBlueChannel(temp, 15, 3);
@@ -605,7 +605,7 @@ Mat paolMat::findMarkerWithMarkerBorders(const Mat &whiteboardImage) {
 //             the filter fails.
 //    sig1: The sigma of the first Gaussian blur. Should be larger than sig2.
 //    sig2: The sigma of the second Gaussian blur.
-Mat paolMat::getDoGEdges(const Mat& orig, int kerSize, float sig1, float sig2) {
+Mat WhiteboardProcessor::getDoGEdges(const Mat& orig, int kerSize, float sig1, float sig2) {
     Mat g1, g2;
     GaussianBlur(orig, g1, Size(kerSize, kerSize), sig1);
     GaussianBlur(orig, g2, Size(kerSize, kerSize), sig2);
@@ -618,13 +618,13 @@ Mat paolMat::getDoGEdges(const Mat& orig, int kerSize, float sig1, float sig2) {
 //    lo: The low threshold of the input brightnesses
 //    hi: The high threshold of the input brightnesses
 //    gamma: The curvature of the level remapping
-Mat paolMat::adjustLevels(const Mat& orig, int lo, int hi, double gamma) {
+Mat WhiteboardProcessor::adjustLevels(const Mat& orig, int lo, int hi, double gamma) {
     return 255/pow(hi-lo, 1/gamma)*(orig-lo)^(1/gamma);
 }
 
 // Given a binary image, locate the connected components in the image
 // WARNING: The returned array must be manually destroyed after use.
-int** paolMat::getConnectedComponents(const Mat& components) {
+int** WhiteboardProcessor::getConnectedComponents(const Mat& components) {
     int** componentLabels = new int*[components.rows];
     for(int i = 0; i < components.rows; i++) {
         componentLabels[i] = new int[components.cols];
@@ -719,7 +719,7 @@ int** paolMat::getConnectedComponents(const Mat& components) {
 // Arguments:
 //    compsImg: The connected components (labels not yet assigned)
 //    keepCompLocs: The pixels that a component must overlap with to be kept
-Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompLocs) {
+Mat WhiteboardProcessor::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompLocs) {
     // Get the component labels
     int** components = getConnectedComponents(compsImg);
 
@@ -765,7 +765,7 @@ Mat paolMat::filterConnectedComponents(const Mat& compsImg, const Mat& keepCompL
 // Locate the marker strokes with the DoG and connected components approach.
 // First, find the DoG edges and threshold them. Then, use pDrift to determine
 // which connected components from the threholded DoG edges should be kept.
-Mat paolMat::findMarkerWithCC(const Mat& orig) {
+Mat WhiteboardProcessor::findMarkerWithCC(const Mat& orig) {
     Mat markerCandidates = getDoGEdges(orig, 13, 17, 1);
     markerCandidates = adjustLevels(markerCandidates, 0, 4, 1);
     markerCandidates = binarize(markerCandidates, 10);
@@ -784,7 +784,7 @@ Mat paolMat::findMarkerWithCC(const Mat& orig) {
 // Arguments:
 //    orig: The image to blur
 //    size: The radius of the box blur kernel
-Mat paolMat::boxBlur(const Mat& orig, int size) {
+Mat WhiteboardProcessor::boxBlur(const Mat& orig, int size) {
     Mat ret;
     cv::blur(orig, ret, Size(2*size+1, 2*size+1));
     return ret;
@@ -796,7 +796,7 @@ Mat paolMat::boxBlur(const Mat& orig, int size) {
 // Arguments:
 //    whiteboardImg: The unmodified whiteboard image to extract the whiteboard colors of
 //    size: The size of the cells
-Mat paolMat::getAvgWhiteboardColor(const Mat& whiteboardImg, int size) {
+Mat WhiteboardProcessor::getAvgWhiteboardColor(const Mat& whiteboardImg, int size) {
     Mat ret = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
     int x,y,xx,yy;
     int count,color,thresh;
@@ -860,7 +860,7 @@ Mat paolMat::getAvgWhiteboardColor(const Mat& whiteboardImg, int size) {
 }
 
 // Given a whiteboard image, darken the text by scaling the difference from the average whiteboard color
-Mat paolMat::raiseMarkerContrast(const Mat& whiteboardImg){
+Mat WhiteboardProcessor::raiseMarkerContrast(const Mat& whiteboardImg){
     Mat hiContrastImg = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
     Mat avg = getAvgWhiteboardColor(whiteboardImg, 10);
 
@@ -896,7 +896,7 @@ Mat paolMat::raiseMarkerContrast(const Mat& whiteboardImg){
 // Arguments:
 //    whiteboardImg: The whiteboard image to modify
 //    markerPixels: A binary image where the marker pixel locations are white
-Mat paolMat::whitenWhiteboard(const Mat& whiteboardImg, const Mat& markerPixels) {
+Mat WhiteboardProcessor::whitenWhiteboard(const Mat& whiteboardImg, const Mat& markerPixels) {
     Mat ret = whiteboardImg.clone();
     //for every pixel
     for(int y = 0; y < whiteboardImg.rows; y++)
@@ -913,7 +913,7 @@ Mat paolMat::whitenWhiteboard(const Mat& whiteboardImg, const Mat& markerPixels)
 
 // Skew the given image so the whiteboard region is rectangular
 // TODO: Modify this method so it takes in a structure of corner coordinates
-Mat paolMat::rectifyImage(const Mat& whiteboardImg){
+Mat WhiteboardProcessor::rectifyImage(const Mat& whiteboardImg){
     Mat ret = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
     double widthP,heightP;
     double LTx,LTy,LBx,LBy,RTx,RTy,RBx,RBy;//L left R right T top B bottom
@@ -958,7 +958,7 @@ Mat paolMat::rectifyImage(const Mat& whiteboardImg){
 
 // Given a whiteboard image, draw red lines through the long straight lines of
 // the image.
-Mat paolMat::findWhiteboardBorders(Mat& whiteboardImg) {
+Mat WhiteboardProcessor::findWhiteboardBorders(Mat& whiteboardImg) {
     // Find edges with Canny detector
     Mat cannyEdges;
     Canny(whiteboardImg, cannyEdges, 50, 200, 3);
@@ -995,7 +995,7 @@ Mat paolMat::findWhiteboardBorders(Mat& whiteboardImg) {
 //    newInfo: The enhanced version of the current whiteboard image, which includes the professor
 //    mvmtInfo: A binary image indicating where there was significant movement (ie. where the
 //              professor might be)
-Mat paolMat::updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo) {
+Mat WhiteboardProcessor::updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo) {
     // Throw exception if one of the given arguments has no image data
     // Mostly useful to protect against updating a nonexistent whiteboard model
     if(!oldWboardModel.data || !newInfo.data || !mvmtInfo.data) {

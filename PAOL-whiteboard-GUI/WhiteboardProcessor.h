@@ -1,6 +1,7 @@
-#ifndef PAOLMAT_H
-#define PAOLMAT_H
+#ifndef WHITEBOARDPROCESSOR_H
+#define WHITEBOARDPROCESSOR_H
 
+#include "ImageProcessor.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -9,7 +10,7 @@
 
 using namespace cv;
 
-class paolMat
+class WhiteboardProcessor : public ImageProcessor
 {
 private:
     /// Constants
@@ -62,11 +63,11 @@ private:
 public:
     /// Definitions for constructing and restoring original state
     /// of the whiteboard processor
-    paolMat();
+    WhiteboardProcessor();
     void reset();
 
     /// Method to process the given frame and update whiteboard model
     void processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput);
 };
 
-#endif // PAOLMAT_H
+#endif // WHITEBOARDPROCESSOR_H
