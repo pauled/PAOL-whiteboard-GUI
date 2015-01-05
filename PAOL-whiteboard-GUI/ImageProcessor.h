@@ -8,8 +8,10 @@ using namespace cv;
 class ImageProcessor {
 public:
     virtual ~ImageProcessor() {}
-    // Process the next image
-    virtual void processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput) = 0;
+    // Process the next image. If it was successfully processed (ie. there
+    // were enough differences from the previous frame), return the processed
+    // frame. Otherwise, return an empty Mat.
+    virtual Mat processCurFrame(const Mat& currentFrame) = 0;
     // Reset the state of this processor
     virtual void reset() = 0;
 };

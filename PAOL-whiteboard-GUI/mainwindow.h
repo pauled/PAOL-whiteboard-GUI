@@ -42,7 +42,7 @@ private:
     ImageScanner* scanner;
 
     // Object to process whiteboard
-    ImageProcessor* wbProcessor;
+    WhiteboardProcessor* wbProcessor;
 
     // Methods to request user input
     string promptFirstDataSetImage();

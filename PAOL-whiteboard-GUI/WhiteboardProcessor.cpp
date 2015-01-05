@@ -12,6 +12,12 @@
 // Constructor
 WhiteboardProcessor::WhiteboardProcessor() {
     reset();
+    debugProcessing = false;
+}
+
+WhiteboardProcessor::WhiteboardProcessor(bool debugFlag) {
+    reset();
+    debugProcessing = debugFlag;
 }
 
 // Return the whiteboard processor to its original state (ie. no processed frames or whiteboard model)
@@ -28,9 +34,9 @@ void WhiteboardProcessor::reset() {
 ///////////////////////////////////////////////////////////////////
 
 // Processes the given frame and updates the whiteboard model.
-void WhiteboardProcessor::processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput) {
-    // Clear out the frames to output
-    frameOutput.clear();
+Mat WhiteboardProcessor::processCurFrame(const Mat& currentFrame) {
+    // Clear out the debugging frames
+    debugFrames.clear();
     // Stores the images that we eventually want to copy to frameOutput
     vector<Mat> toSave;
 
@@ -38,7 +44,7 @@ void WhiteboardProcessor::processCurFrame(const Mat& currentFrame, vector<Mat>& 
     if(!oldFrame.data) {
         // Duplicate the current frame
         oldFrame = currentFrame.clone();
-        return;
+        return Mat();
     }
 
     // Find difference pixels
@@ -63,18 +69,23 @@ void WhiteboardProcessor::processCurFrame(const Mat& currentFrame, vector<Mat>& 
     //if the differences are enough that we know where the lecturer is or the images have been identical
     //for two frames, and hence no lecturer present
     if(refinedNumDif>.04 || (numDif <.000001 && stableImageCount==2)){
+        // Store the old and current frames for debugging
+        toSave.push_back(oldFrame);
+        toSave.push_back(currentFrame);
 
         /////////////////////////////////////////////////////////////
         // Display the old and current frames being processed
         Mat markerLocation = WhiteboardProcessor::findMarkerWithCC(currentFrame);
 //        Mat markerLocation = WhiteboardProcessor::findMarkerWithMarkerBorders(currentFrame);
         Mat darkenedText = WhiteboardProcessor::whitenWhiteboard(currentFrame, markerLocation);
+        toSave.push_back(darkenedText);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
 
         Mat diffHulls = WhiteboardProcessor::expandDifferencesRegion(filteredDiffs);
         Mat diffHullsFullSize = WhiteboardProcessor::enlarge(diffHulls);
+        toSave.push_back(diffHullsFullSize);
 
         ////////////////////////////////////////////////////////////////////////////////
 
@@ -96,11 +107,17 @@ void WhiteboardProcessor::processCurFrame(const Mat& currentFrame, vector<Mat>& 
 
         // Rectify the model
         Mat rectified = WhiteboardProcessor::rectifyImage(whiteboardModel);
+        toSave.push_back(rectified);
 
-        // Push images to save to frameOutput
-        for(unsigned int i = 0; i < toSave.size(); i++) {
-            frameOutput.push_back(toSave[i].clone());
+        // If debugging whiteboard processing, push images to save to debugFrames
+        if(debugProcessing) {
+            for(unsigned int i = 0; i < toSave.size(); i++) {
+                debugFrames.push_back(toSave[i].clone());
+            }
         }
+
+        // Return a copy of the current whiteboard model
+        return whiteboardModel.clone();
 
         //////////////////////////////////////////////////
 
@@ -110,6 +127,9 @@ void WhiteboardProcessor::processCurFrame(const Mat& currentFrame, vector<Mat>& 
         // Make updated version of marker model
         // If updated version greatly differs from previous version, save whiteboard model
     }
+
+    // The frame was not processed, so return an empty Mat
+    return Mat();
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -1018,4 +1038,13 @@ Mat WhiteboardProcessor::updateWhiteboardModel(const Mat& oldWboardModel, const 
     }
 
     return updatedModel;
+}
+
+///////////////////////////////////////////////////////////////////
+///
+///   Method to get debugging frames
+///
+///////////////////////////////////////////////////////////////////
+vector<Mat> WhiteboardProcessor::getDebugFrames() {
+    return debugFrames;
 }

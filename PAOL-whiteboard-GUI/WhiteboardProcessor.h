@@ -24,6 +24,10 @@ private:
     Mat oldFrame;
     Mat whiteboardModel;
 
+    /// Fields for debugging whiteboard processing
+    bool debugProcessing;
+    vector<Mat> debugFrames;
+
     /// Utility methods
 
     /// Methods to find and process differences (ie. find the lecturer)
@@ -64,10 +68,14 @@ public:
     /// Definitions for constructing and restoring original state
     /// of the whiteboard processor
     WhiteboardProcessor();
+    WhiteboardProcessor(bool debugFlag);
     void reset();
 
     /// Method to process the given frame and update whiteboard model
-    void processCurFrame(const Mat& currentFrame, vector<Mat>& frameOutput);
+    Mat processCurFrame(const Mat& currentFrame);
+
+    /// Method to get debugging frames
+    vector<Mat> getDebugFrames();
 };
 
 #endif // WHITEBOARDPROCESSOR_H

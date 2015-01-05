@@ -29,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent) :
     pause=false;
 
     scanner = NULL;
-    wbProcessor = new WhiteboardProcessor();
+    wbProcessor = new WhiteboardProcessor(true);
 
     qTimer = new QTimer(this);
     connect(qTimer, SIGNAL(timeout()), this, SLOT(displayFrame()));
@@ -53,17 +53,20 @@ void MainWindow::displayFrame() {
         // Take a picture
         bool gotImage = scanner->getNextImage(currentFrame, currentFrameTime, deviceNum);
         if(gotImage) {
-            // We got the next picture, so process it
-            vector<Mat> output;
             // Time how long it takes to process a frame
             Clock clock;
-            wbProcessor->processCurFrame(currentFrame, output);
+            Mat wboardModel = wbProcessor->processCurFrame(currentFrame);
             qDebug("Processed whiteboard in %ld ms", clock.getElapsedTime());
             // Save the new whiteboard image to file if one was produced
-            if(output.size() == 1) {
-                Mat wboardModel = output[0];
-                displayMat(wboardModel, *ui->imDisplay1);
-                saveWhiteboardImage(wboardModel, currentFrameTime, deviceNum);
+            if(wboardModel.data) {
+                vector<Mat> debugFrames = wbProcessor->getDebugFrames();
+                displayMat(debugFrames[0], *ui->imDisplay1);
+                displayMat(debugFrames[1], *ui->imDisplay2);
+                displayMat(debugFrames[2], *ui->imDisplay3);
+                displayMat(debugFrames[3], *ui->imDisplay4);
+                displayMat(debugFrames[4], *ui->imDisplay5);
+                displayMat(debugFrames[5], *ui->imDisplay6);
+//                saveWhiteboardImage(wboardModel, currentFrameTime, deviceNum);
             }
         }
         else {
