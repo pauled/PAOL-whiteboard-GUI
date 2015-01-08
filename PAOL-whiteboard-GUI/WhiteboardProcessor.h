@@ -60,6 +60,8 @@ private:
     static Mat whitenWhiteboard(const Mat &whiteboardImg, const Mat& markerPixels);
     static Mat rectifyImage(const Mat& whiteboardImg);
     static Mat findWhiteboardBorders(Mat& whiteboardImg);
+    static Mat enhanceMarkerByLine(const Mat& orig, const Mat &markerLocation);
+    static Mat enhanceMarkerByCC(const Mat& orig, const Mat& markerLocation);
 
     /// Update the background (whiteboard) model
     static Mat updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo);

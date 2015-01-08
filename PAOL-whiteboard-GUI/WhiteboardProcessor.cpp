@@ -76,8 +76,7 @@ Mat WhiteboardProcessor::processCurFrame(const Mat& currentFrame) {
         /////////////////////////////////////////////////////////////
         // Display the old and current frames being processed
         Mat markerLocation = WhiteboardProcessor::findMarkerWithCC(currentFrame);
-//        Mat markerLocation = WhiteboardProcessor::findMarkerWithMarkerBorders(currentFrame);
-        Mat darkenedText = WhiteboardProcessor::whitenWhiteboard(currentFrame, markerLocation);
+        Mat darkenedText = WhiteboardProcessor::enhanceMarkerByCC(currentFrame, markerLocation);
         toSave.push_back(darkenedText);
 
         /////////////////////////////////////////////////////////////
@@ -1001,6 +1000,128 @@ Mat WhiteboardProcessor::findWhiteboardBorders(Mat& whiteboardImg) {
         pt2.y = cvRound(y0 - 2000*(a));
         line( ret, pt1, pt2, Scalar(0,0,255), 3, CV_AA);
     }
+    return ret;
+}
+
+// Scale marker colors so they contrast more smoothly against the whiteboard. The scale is determined
+// by scanning, then scaling the brightnesses of each horizontal line in each component.
+Mat WhiteboardProcessor::enhanceMarkerByLine(const Mat& orig, const Mat& markerLocation){
+    Mat ret = Mat::zeros(orig.size(), orig.type());
+    int start,end;
+    for(int y = 0; y < orig.rows; y++)
+        for(int x = 0; x < orig.cols; x++)
+            if(markerLocation.at<Vec3b>(y,x)[0] != 0){
+                start = x;//set start of section at first white pixel in markerLocation
+                int rLo = 256;
+                int gLo = 256;
+                int bLo = 256;
+
+                //for all pixels until next black pixel in markerLocation
+                for(;x < orig.cols && markerLocation.at<Vec3b>(y,x)[0] != 0; x++){
+                    end = x;//reset end of section
+                    // Update lowest values found for each channel
+                    rLo = std::min(rLo, (int)orig.at<Vec3b>(y,x)[2]);
+                    gLo = std::min(gLo, (int)orig.at<Vec3b>(y,x)[1]);
+                    bLo = std::min(bLo, (int)orig.at<Vec3b>(y,x)[0]);
+                }
+
+                // Determine scale factor
+                float darkest = std::min(rLo, std::min(gLo, bLo));
+                float scale = 255/darkest;
+
+                // Go back through the line and scale the colors
+                for(int xx = start; xx <= end; xx++){
+                    int rOut,gOut,bOut;
+                    rOut = 255-(255-orig.at<Vec3b>(y,xx)[2])*scale;
+                    gOut = 255-(255-orig.at<Vec3b>(y,xx)[1])*scale;
+                    bOut = 255-(255-orig.at<Vec3b>(y,xx)[0])*scale;
+
+                    ret.at<Vec3b>(y,xx)[0] = bOut;
+                    ret.at<Vec3b>(y,xx)[1] = gOut;
+                    ret.at<Vec3b>(y,xx)[2] = rOut;
+                }
+            } else {
+                ret.at<Vec3b>(y,x)[0] = 255;
+                ret.at<Vec3b>(y,x)[1] = 255;
+                ret.at<Vec3b>(y,x)[2] = 255;
+            }
+    return ret;
+}
+
+// Scale marker colors so they contrast more smoothly against the whiteboard. The scale is determined
+// by scanning over all pixels in each component, then scaling the brightness of the components.
+Mat WhiteboardProcessor::enhanceMarkerByCC(const Mat& orig, const Mat& markerLocation){
+    Mat ret = Mat::zeros(orig.size(), orig.type());
+    int numRows = orig.rows;
+    int numCols = orig.cols;
+
+    // Get the connected component labels
+    int** compLabels = getConnectedComponents(markerLocation);
+    // Find the largest component label
+    int maxLabel = -1;
+    for(int i = 0; i < numRows; i++) {
+        for(int j = 0; j < numCols; j++) {
+            maxLabel = std::max(maxLabel, compLabels[i][j]);
+        }
+    }
+
+    // Initialize minimum values for each component
+    int low[maxLabel+1];
+    for(int i = 1; i < maxLabel+1; i++)
+        low[i] = 5000;
+
+    // Determine the minimum value for each component
+    for(int i = 0; i < numRows; i++) {
+        for(int j = 0; j < numCols; j++) {
+            // If there is a component at this pixel, get the lowest value of the channels of this pixel
+            int compLabel = compLabels[i][j];
+            if(compLabel > 0) {
+                // Get the channel values at the current pixel
+                int red = orig.at<Vec3b>(i,j)[2];
+                int green = orig.at<Vec3b>(i,j)[1];
+                int blue = orig.at<Vec3b>(i,j)[0];
+                // Get the minimum of the channel values
+                int pixelLo = std::min(red, std::min(green, blue));
+                // Update the minimum value in the component
+                low[compLabel] = std::min(low[compLabel], pixelLo);
+            }
+        }
+    }
+
+    // Find the scales to use for each component
+    float scale[maxLabel+1];
+    for(int i = 1; i < maxLabel+1; i++) {
+        if(low[i] == 0)
+            scale[i] = 1;
+        else
+            scale[i] = ((float)255)/low[i];
+    }
+
+    // Scale the brightnesses component-wise
+    for(int i = 0; i < numRows; i++) {
+        for(int j = 0; j < numCols; j++) {
+            // If there is a component at this pixel
+            int compLabel = compLabels[i][j];
+            if(compLabel > 0) {
+                float s = scale[compLabel];
+                ret.at<Vec3b>(i,j)[0] = 255-(255-orig.at<Vec3b>(i,j)[0])*s;
+                ret.at<Vec3b>(i,j)[1] = 255-(255-orig.at<Vec3b>(i,j)[1])*s;
+                ret.at<Vec3b>(i,j)[2] = 255-(255-orig.at<Vec3b>(i,j)[2])*s;
+            }
+            else {
+                ret.at<Vec3b>(i,j)[0] = 255;
+                ret.at<Vec3b>(i,j)[1] = 255;
+                ret.at<Vec3b>(i,j)[2] = 255;
+            }
+        }
+    }
+
+    // Free memory used by component labels
+    for(int i = 0; i < numRows; i++) {
+        delete [] compLabels[i];
+    }
+    delete [] compLabels;
+
     return ret;
 }
 
