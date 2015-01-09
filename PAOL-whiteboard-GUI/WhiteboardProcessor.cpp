@@ -77,8 +77,8 @@ Mat WhiteboardProcessor::processCurFrame(const Mat& currentFrame) {
         // Display the old and current frames being processed
         Mat markerLocation = WhiteboardProcessor::findMarkerWithCC(currentFrame);
         Mat whiteWhiteboard = whitenWhiteboard(currentFrame, markerLocation);
-        Mat darkenedText = smoothMarkerTransition(whiteWhiteboard);
-        toSave.push_back(darkenedText);
+        Mat smoothedMarker = smoothMarkerTransition(whiteWhiteboard);
+        toSave.push_back(smoothedMarker);
 
         /////////////////////////////////////////////////////////////
         //identify where motion is
@@ -92,11 +92,11 @@ Mat WhiteboardProcessor::processCurFrame(const Mat& currentFrame) {
         // Update background image (whiteboard model)
         if(!whiteboardModel.data) {
             // There is no previous whiteboard model, so set it to the enhanced image
-            whiteboardModel = darkenedText;
+            whiteboardModel = smoothedMarker;
         }
         else {
             // Update the existing whiteboard model
-            whiteboardModel = WhiteboardProcessor::updateWhiteboardModel(whiteboardModel, darkenedText, diffHullsFullSize);
+            whiteboardModel = WhiteboardProcessor::updateWhiteboardModel(whiteboardModel, smoothedMarker, diffHullsFullSize);
         }
         toSave.push_back(whiteboardModel);
 
