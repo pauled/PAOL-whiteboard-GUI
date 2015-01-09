@@ -76,11 +76,8 @@ Mat WhiteboardProcessor::processCurFrame(const Mat& currentFrame) {
         /////////////////////////////////////////////////////////////
         // Display the old and current frames being processed
         Mat markerLocation = WhiteboardProcessor::findMarkerWithCC(currentFrame);
-        imwrite("/home/paol/shared/out/markerLocation.png", markerLocation);
         Mat whiteWhiteboard = whitenWhiteboard(currentFrame, markerLocation);
-        imwrite("/home/paol/shared/out/whiteWhiteboard.png", whiteWhiteboard);
         Mat darkenedText = smoothMarkerTransition(whiteWhiteboard);
-        imwrite("/home/paol/shared/out/smoothMarker.png", darkenedText);
         toSave.push_back(darkenedText);
 
         /////////////////////////////////////////////////////////////
@@ -482,13 +479,13 @@ Mat WhiteboardProcessor::expandDifferencesRegion(const Mat& differences) {
     // Dilate the difference pixels
     Mat grownDiffs = replicateToImageBorder(differences);
     grownDiffs = sweepDown(grownDiffs);
-    grownDiffs = binarize(grownDiffs, 255);
+    grownDiffs = binarizeAnd(grownDiffs, 255);
     grownDiffs = borderContentWithGreen(grownDiffs, 8);
 
     // Draw hull around the dilation
     Mat diffHulls = getImageContours(grownDiffs);
     diffHulls = sweepDown(diffHulls);
-    diffHulls = binarize(diffHulls, 255);
+    diffHulls = binarizeAnd(diffHulls, 255);
 
     return diffHulls;
 }
@@ -501,12 +498,34 @@ Mat WhiteboardProcessor::expandDifferencesRegion(const Mat& differences) {
 
 // Determine the pixels in orig where all the values of all three
 // channels are greater than the threshold
-Mat WhiteboardProcessor::binarize(const Mat& orig, int threshold) {
+Mat WhiteboardProcessor::binarizeAnd(const Mat& orig, int threshold) {
     Mat binarized = Mat::zeros(orig.size(), orig.type());
     for(int i = 0; i < orig.rows; i++) {
         for(int j = 0; j < orig.cols; j++) {
             if(orig.at<Vec3b>(i,j)[0] >= threshold &&
                     orig.at<Vec3b>(i,j)[1] >= threshold &&
+                    orig.at<Vec3b>(i,j)[2] >= threshold) {
+                binarized.at<Vec3b>(i,j)[0] = 255;
+                binarized.at<Vec3b>(i,j)[1] = 255;
+                binarized.at<Vec3b>(i,j)[2] = 255;
+            } else {
+                binarized.at<Vec3b>(i,j)[0] = 0;
+                binarized.at<Vec3b>(i,j)[1] = 0;
+                binarized.at<Vec3b>(i,j)[2] = 0;
+            }
+        }
+    }
+    return binarized;
+}
+
+// Determine the pixels in orig where one of the values of all three
+// channels are greater than the threshold
+Mat WhiteboardProcessor::binarizeOr(const Mat& orig, int threshold) {
+    Mat binarized = Mat::zeros(orig.size(), orig.type());
+    for(int i = 0; i < orig.rows; i++) {
+        for(int j = 0; j < orig.cols; j++) {
+            if(orig.at<Vec3b>(i,j)[0] >= threshold ||
+                    orig.at<Vec3b>(i,j)[1] >= threshold ||
                     orig.at<Vec3b>(i,j)[2] >= threshold) {
                 binarized.at<Vec3b>(i,j)[0] = 255;
                 binarized.at<Vec3b>(i,j)[1] = 255;
@@ -789,14 +808,11 @@ Mat WhiteboardProcessor::filterConnectedComponents(const Mat& compsImg, const Ma
 // First, find the DoG edges and threshold them. Then, use pDrift to determine
 // which connected components from the threholded DoG edges should be kept.
 Mat WhiteboardProcessor::findMarkerWithCC(const Mat& orig) {
-    imwrite("/home/paol/shared/out/orig.png", orig);
     Mat markerCandidates = getDoGEdges(orig, 13, 17, 1);
     markerCandidates = adjustLevels(markerCandidates, 0, 4, 1);
-    markerCandidates = binarize(markerCandidates, 10);
-    imwrite("/home/paol/shared/out/DoG.png", markerCandidates);
+    markerCandidates = binarizeAnd(markerCandidates, 10);
     Mat markerLocations = pDrift(orig);
-    markerLocations = binarize(markerLocations, 10);
-    imwrite("/home/paol/shared/out/pDrift.png", markerLocations);
+    markerLocations = binarizeOr(markerLocations, 20);
     return filterConnectedComponents(markerCandidates, markerLocations);
 }
 

@@ -12,7 +12,7 @@ using namespace cv;
 
 class WhiteboardProcessor : public ImageProcessor
 {
-private:
+public:
     /// Constants
     // Scaling factor for processing on smaller versions of whiteboard
     static const int SCALE = 8;
@@ -42,7 +42,8 @@ private:
     static Mat expandDifferencesRegion(const Mat& differences);
 
     /// Methods to find the marker strokes
-    static Mat binarize(const Mat& orig, int threshold);
+    static Mat binarizeAnd(const Mat& orig, int threshold);
+    static Mat binarizeOr(const Mat& orig, int threshold);
     static Mat thresholdOnBlueChannel(const Mat& orig, int blueThresh, int size);
     static Mat pDrift(const Mat& orig);
     static Mat fillMarkerBorders(const Mat& markerBorders);
