@@ -28,7 +28,7 @@ DatasetImageScanner::DatasetImageScanner(string firstImagePath)
     }
 }
 
-bool DatasetImageScanner::getNextImage(Mat &destination, int &frameTime, int &devNum) {
+bool DatasetImageScanner::getNextImage(Mat &destination) {
     // Attempt to read the next file using the stored time and index of the next frame
     char nextFrameLoc[256];
     Mat temp;
@@ -47,10 +47,6 @@ bool DatasetImageScanner::getNextImage(Mat &destination, int &frameTime, int &de
 
             // Update destination, next frame index and time if read was successful
             if(temp.data) {
-                // Save frame time and device number
-                frameTime = tempFrameTime;
-                devNum = datasetCamNum;
-
                 // Save image
                 destination = temp.clone();
 

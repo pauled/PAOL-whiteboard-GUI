@@ -26,7 +26,7 @@ private:
 
 public:
     DatasetImageScanner(string firstImagePath);
-    virtual bool getNextImage(cv::Mat &destination, int &frameTime, int &devNum);
+    bool getNextImage(cv::Mat &destination);
 };
 
 #endif // DATASETIMAGESCANNER_H

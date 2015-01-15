@@ -29,10 +29,15 @@ MainWindow::MainWindow(QWidget *parent) :
     pause=false;
 
     scanner = NULL;
-    wbProcessor = new WhiteboardProcessor(true);
 
+    // Initialize counts for processing
+    stableWhiteboardCount = 0;
+    saveImageCount = 0;
+    capturedImageCount = 0;
+
+    // Set timer
     qTimer = new QTimer(this);
-    connect(qTimer, SIGNAL(timeout()), this, SLOT(displayFrame()));
+    connect(qTimer, SIGNAL(timeout()), this, SLOT(workOnNextImage()));
     qTimer->start(100);
 }
 
@@ -41,33 +46,14 @@ MainWindow::~MainWindow()
     delete ui;
     delete qTimer;
     delete scanner;
-    delete wbProcessor;
 }
 
-void MainWindow::displayFrame() {
-    if(!pause && runCam){
-        Mat currentFrame;
-        int currentFrameTime;
-        int deviceNum;
-
-        // Take a picture
-        bool gotImage = scanner->getNextImage(currentFrame, currentFrameTime, deviceNum);
-        if(gotImage) {
-            // Time how long it takes to process a frame
-            Clock clock;
-            Mat wboardModel = wbProcessor->processCurFrame(currentFrame);
-            qDebug("Processed whiteboard in %ld ms", clock.getElapsedTime());
-            // Save the new whiteboard image to file if one was produced
-            if(wboardModel.data) {
-                vector<Mat> debugFrames = wbProcessor->getDebugFrames();
-                displayMat(debugFrames[0], *ui->imDisplay1);
-                displayMat(debugFrames[1], *ui->imDisplay2);
-                displayMat(debugFrames[2], *ui->imDisplay3);
-                displayMat(debugFrames[3], *ui->imDisplay4);
-                displayMat(debugFrames[4], *ui->imDisplay5);
-                displayMat(debugFrames[5], *ui->imDisplay6);
-//                saveWhiteboardImage(wboardModel, currentFrameTime, deviceNum);
-            }
+void MainWindow::workOnNextImage() {
+    if(!pause && runCam) {
+        // Try to take a picture
+        bool gotPicture = takePicture();
+        if(gotPicture) {
+            processImage();
         }
         else {
             // We couldn't get the next picture, so stop processing
@@ -77,18 +63,84 @@ void MainWindow::displayFrame() {
     }
 }
 
+bool MainWindow::takePicture() {
+    return scanner->getNextImage(currentFrame);
+}
+
+void MainWindow::processImage() {
+    displayMat(currentFrame, *ui->imDisplay1);
+
+    //compare picture to previous picture and store differences in allDiffs
+    float numDif;
+    Mat allDiffs;
+    WhiteboardProcessor::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
+
+    //if there is enough of a difference between the two images
+    float refinedNumDif = 0;
+    Mat filteredDiffs = Mat::zeros(currentFrame.size(), currentFrame.type());
+    if(numDif>.03){
+        // Find the true differences
+        WhiteboardProcessor::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
+        stableWhiteboardCount=0;
+    }
+
+    //if the images are really identical, count the number of consecultive nearly identical images
+    if (numDif < .000001)
+        stableWhiteboardCount++;
+
+    //if the differences are enough that we know where the lecturer is or the images have been identical
+    //for two frames, and hence no lecturer present
+    if(refinedNumDif>.04 || (numDif <.000001 && stableWhiteboardCount==2)){
+        // Find marker strokes and enhance the whiteboard (ie. make all non-marker white)
+        Mat currentMarker = WhiteboardProcessor::findMarkerWithCC(currentFrame);
+        Mat whiteWhiteboard = WhiteboardProcessor::whitenWhiteboard(currentFrame, currentMarker);
+        Mat enhancedMarker = WhiteboardProcessor::smoothMarkerTransition(whiteWhiteboard);
+
+        /////////////////////////////////////////////////////////////
+        //identify where motion is
+        Mat diffHulls = WhiteboardProcessor::expandDifferencesRegion(filteredDiffs);
+        Mat diffHullsFullSize = WhiteboardProcessor::enlarge(diffHulls);
+
+        ///////////////////////////////////////////////////////////////////////
+
+        // Get what the whiteboard currently looks like
+        Mat currentWhiteboardModel = WhiteboardProcessor::updateWhiteboardModel(oldRefinedBackground, enhancedMarker, diffHullsFullSize);
+        // Get what the marker currently looks like
+        Mat newMarkerModel = WhiteboardProcessor::updateWhiteboardModel(oldMarkerModel, currentMarker, diffHullsFullSize);
+        //////////////////////////////////////////////////
+
+        //figure out if saves need to be made
+
+        // Get a percentage for how much the marker model changed
+        float saveNumDif = WhiteboardProcessor::findMarkerModelDiffs(oldMarkerModel, newMarkerModel);
+        if (saveNumDif>.004){
+//            saveImageWithTimestamp(oldRefinedBackground);
+            displayMat(oldRefinedBackground, *ui->imDisplay2);
+        }
+        //copy last clean whiteboard image
+        oldRefinedBackground = currentWhiteboardModel.clone();
+        oldMarkerModel = newMarkerModel.clone();
+    }
+    oldFrame = currentFrame.clone();
+}
+
 void MainWindow::on_camera_clicked()
 {
     // Stop processing
     runCam=false;
-    // Reset the whiteboard processor
-    wbProcessor->reset();
     // Clear the old scanner object
     delete scanner;
 
     try {
         // Initialize scanner
         scanner = new WebcamImageScanner(promptWebcamNumber());
+
+        // Initialize the current frame and whiteboard processing models
+        takePicture();
+        oldFrame = currentFrame.clone();
+        oldRefinedBackground = Mat::zeros(oldFrame.size(), oldFrame.type());
+        oldMarkerModel = Mat::zeros(oldFrame.size(), oldFrame.type());
+
         // Start processing whiteboard
         runCam = true;
         pause = false;
@@ -106,14 +158,19 @@ void MainWindow::on_loadDataSet_clicked()
 {
     // Stop processing
     runCam=false;
-    // Reset the whiteboard processor
-    wbProcessor->reset();
     // Clear the old scanner object
     delete scanner;
 
     try {
         // Initialize scanner
         scanner = new DatasetImageScanner(promptFirstDataSetImage());
+
+        // Initialize the current frame and whiteboard processing models
+        takePicture();
+        oldFrame = currentFrame.clone();
+        oldRefinedBackground = Mat::zeros(oldFrame.size(), oldFrame.type());
+        oldMarkerModel = Mat::zeros(oldFrame.size(), oldFrame.type());
+
         // Start processing whiteboard
         runCam = true;
         pause = false;

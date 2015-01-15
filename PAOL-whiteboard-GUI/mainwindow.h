@@ -21,7 +21,7 @@ public:
     ~MainWindow();
 
 private slots:
-    void displayFrame();
+    void workOnNextImage();
 
     void on_camera_clicked();
 
@@ -41,8 +41,18 @@ private:
     // Object to read from data set or webcam
     ImageScanner* scanner;
 
-    // Object to process whiteboard
-    WhiteboardProcessor* wbProcessor;
+    // Fields for general processing (mostly saving the image)
+    int saveImageCount;
+    char saveImagePathFormat[256];
+    time_t currentImageTime;
+    int capturedImageCount; // How many images were captured from the camera
+
+    // Fields for whiteboard processing
+    Mat currentFrame;
+    Mat oldFrame;
+    Mat oldMarkerModel;
+    Mat oldRefinedBackground; // What the whiteboard from the oldFrame looks like
+    int stableWhiteboardCount;
 
     // Methods to request user input
     string promptFirstDataSetImage();
@@ -54,6 +64,10 @@ private:
 
     // Method to save images
     void saveWhiteboardImage(const Mat& frame, int &frameTime, int &deviceNum);
+
+    // Methods for processing whiteboard
+    bool takePicture();
+    void processImage();
 };
 
 #endif // MAINWINDOW_H

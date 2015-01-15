@@ -30,24 +30,15 @@ WebcamImageScanner::~WebcamImageScanner() {
         cam.release();
 }
 
-bool WebcamImageScanner::getNextImage(Mat& destination, int& frameTime, int& devNum) {
+bool WebcamImageScanner::getNextImage(Mat& destination) {
     Mat temp;
     //grab 5 consecutive images to clear camera buffer
     for (int i = 0; i < 5;i++) {
         cam >> temp;
     }
     if(temp.data) {
-        // Set device number
-        devNum = webcamNum;
-
-        // Set current frame time
-        time_t curTime;
-        time(&curTime);
-        frameTime = (int)curTime;
-
         // Copy image to destination
         destination = temp.clone();
-
         qDebug("Successfully took a webcam picture.");
         return true;
     }

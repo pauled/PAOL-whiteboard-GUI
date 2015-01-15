@@ -12,7 +12,7 @@ public:
     //    frameTime: Where to store the timestamp of the read image
     //    devNum: Where to store the device number that the scanner reads from,
     //            ie. the webcam number
-    virtual bool getNextImage(cv::Mat& destination, int& frameTime, int& devNum) = 0;
+    virtual bool getNextImage(cv::Mat& destination) = 0;
 };
 
 #endif // IMAGESCANNER_H

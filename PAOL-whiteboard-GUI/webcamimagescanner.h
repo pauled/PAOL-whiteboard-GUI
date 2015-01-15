@@ -17,7 +17,7 @@ private:
 public:
     WebcamImageScanner(int devNum);
     ~WebcamImageScanner();
-    virtual bool getNextImage(Mat& destination, int& frameTime, int& devNum);
+    bool getNextImage(Mat& destination);
 };
 
 #endif // WEBCAMIMAGESCANNER_H
