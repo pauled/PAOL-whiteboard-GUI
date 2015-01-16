@@ -65,10 +65,18 @@ void MainWindow::workOnNextImage() {
 }
 
 bool MainWindow::takePicture() {
+    oldFrame = currentFrame.clone();
     return scanner->getNextImage(currentFrame);
 }
 
 void MainWindow::processImage() {
+    // If this is the first time processing, initialize WB processing fields and return
+    // without further processing
+    if(!oldFrame.data) {
+        oldRefinedBackground = Mat::zeros(currentFrame.size(), currentFrame.type());
+        oldMarkerModel = Mat::zeros(currentFrame.size(), currentFrame.type());
+        return;
+    }
 
     //compare picture to previous picture and store differences in allDiffs
     float numDif;
@@ -131,8 +139,6 @@ void MainWindow::processImage() {
             oldRefinedBackground = whiteWhiteboard.clone();
         }
     }
-    // Update the old frame
-    oldFrame = currentFrame.clone();
 }
 
 void MainWindow::on_camera_clicked()
@@ -145,12 +151,6 @@ void MainWindow::on_camera_clicked()
     try {
         // Initialize scanner
         scanner = new WebcamImageScanner(promptWebcamNumber());
-
-        // Initialize the current frame and whiteboard processing models
-        takePicture();
-        oldFrame = currentFrame.clone();
-        oldRefinedBackground = Mat::zeros(oldFrame.size(), oldFrame.type());
-        oldMarkerModel = Mat::zeros(oldFrame.size(), oldFrame.type());
 
         // Start processing whiteboard
         runCam = true;
@@ -175,12 +175,6 @@ void MainWindow::on_loadDataSet_clicked()
     try {
         // Initialize scanner
         scanner = new DatasetImageScanner(promptFirstDataSetImage());
-
-        // Initialize the current frame and whiteboard processing models
-        takePicture();
-        oldFrame = currentFrame.clone();
-        oldRefinedBackground = Mat::zeros(oldFrame.size(), oldFrame.type());
-        oldMarkerModel = Mat::zeros(oldFrame.size(), oldFrame.type());
 
         // Start processing whiteboard
         runCam = true;
