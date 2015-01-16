@@ -53,6 +53,7 @@ void MainWindow::workOnNextImage() {
         // Try to take a picture
         bool gotPicture = takePicture();
         if(gotPicture) {
+            displayMat(currentFrame, *ui->imDisplay1);
             processImage();
         }
         else {
@@ -68,58 +69,69 @@ bool MainWindow::takePicture() {
 }
 
 void MainWindow::processImage() {
-    displayMat(currentFrame, *ui->imDisplay1);
 
     //compare picture to previous picture and store differences in allDiffs
     float numDif;
     Mat allDiffs;
     WhiteboardProcessor::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
 
-    //if there is enough of a difference between the two images
-    float refinedNumDif = 0;
-    Mat filteredDiffs = Mat::zeros(currentFrame.size(), currentFrame.type());
-    if(numDif>.03){
-        // Find the true differences
+    // If there is a large enough difference, reset the stable whiteboard image count and do further processing
+    if(numDif > .01) {
+        // Reset stable whiteboard image count
+        stableWhiteboardCount = 0;
+        // Find true differences (ie. difference pixels with enough differences surrounding them)
+        float refinedNumDif;
+        Mat filteredDiffs;
         WhiteboardProcessor::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
-        stableWhiteboardCount=0;
-    }
 
-    //if the images are really identical, count the number of consecultive nearly identical images
-    if (numDif < .000001)
-        stableWhiteboardCount++;
+        // Find if there are enough true differences to update the current marker and whiteboard models
+        // (ie. professor movement or lighting change detected)
+        if(refinedNumDif > .01) {
+            // Identify where the motion (ie. the professor) is
+            Mat movement = WhiteboardProcessor::expandDifferencesRegion(filteredDiffs);
+            // Rescale movement info to full size
+            Mat mvmtFullSize = WhiteboardProcessor::enlarge(movement);
 
-    //if the differences are enough that we know where the lecturer is or the images have been identical
-    //for two frames, and hence no lecturer present
-    if(refinedNumDif>.04 || (numDif <.000001 && stableWhiteboardCount==2)){
-        // Find marker strokes and enhance the whiteboard (ie. make all non-marker white)
-        Mat currentMarker = WhiteboardProcessor::findMarkerWithCC(currentFrame);
-        Mat whiteWhiteboard = WhiteboardProcessor::whitenWhiteboard(currentFrame, currentMarker);
-        Mat enhancedMarker = WhiteboardProcessor::smoothMarkerTransition(whiteWhiteboard);
+            // Get the marker model of the current frame
+            Mat currentMarkerWithProf = WhiteboardProcessor::findMarkerWithCC(currentFrame);
+            // Use the movement information to erase the professor
+            Mat currentMarkerModel = WhiteboardProcessor::updateModel(
+                        oldMarkerModel, currentMarkerWithProf, mvmtFullSize);
 
-        /////////////////////////////////////////////////////////////
-        //identify where motion is
-        Mat diffHulls = WhiteboardProcessor::expandDifferencesRegion(filteredDiffs);
-        Mat diffHullsFullSize = WhiteboardProcessor::enlarge(diffHulls);
-
-        ///////////////////////////////////////////////////////////////////////
-
-        // Get what the whiteboard currently looks like
-        Mat currentWhiteboardModel = WhiteboardProcessor::updateWhiteboardModel(oldRefinedBackground, enhancedMarker, diffHullsFullSize);
-        // Get what the marker currently looks like
-        Mat newMarkerModel = WhiteboardProcessor::updateWhiteboardModel(oldMarkerModel, currentMarker, diffHullsFullSize);
-        //////////////////////////////////////////////////
-
-        //figure out if saves need to be made
-
-        // Get a percentage for how much the marker model changed
-        float saveNumDif = WhiteboardProcessor::findMarkerModelDiffs(oldMarkerModel, newMarkerModel);
-        if (saveNumDif>.004){
-            saveImageWithTimestamp(oldRefinedBackground);
+            // Find how much the current marker model differs from the stored one
+            float markerDiffs = WhiteboardProcessor::findMarkerModelDiffs(oldMarkerModel, currentMarkerModel);
+            // Save and update the models if the marker content changed enough
+            if(markerDiffs > .004) {
+                // Save the smooth marker version of the old background image
+                Mat oldRefinedBackgroundSmooth = WhiteboardProcessor::smoothMarkerTransition(oldRefinedBackground);
+                saveImageWithTimestamp(oldRefinedBackgroundSmooth);
+                // Update marker model
+                oldMarkerModel = currentMarkerModel.clone();
+                // Update enhanced version of background
+                Mat whiteWhiteboard = WhiteboardProcessor::whitenWhiteboard(currentFrame, currentMarkerModel);
+                oldRefinedBackground = WhiteboardProcessor::updateModel(
+                            oldRefinedBackground, whiteWhiteboard, mvmtFullSize);
+            }
         }
-        //copy last clean whiteboard image
-        oldRefinedBackground = currentWhiteboardModel.clone();
-        oldMarkerModel = newMarkerModel.clone();
     }
+    // Otherwise, check if the frames are basically identical (ie. stable)
+    else if(numDif < .000001) {
+        stableWhiteboardCount++;
+        // If the image has been stable for exactly three frames, the lecturer is not present, so we
+        // can update the marker and whiteboard models without movement information
+        if(stableWhiteboardCount == 3) {
+            // Save the smooth marker version of the old background image
+            Mat oldRefinedBackgroundSmooth = WhiteboardProcessor::smoothMarkerTransition(oldRefinedBackground);
+            saveImageWithTimestamp(oldRefinedBackgroundSmooth);
+            // Update marker model
+            Mat currentMarkerModel = WhiteboardProcessor::findMarkerWithCC(currentFrame);
+            oldMarkerModel = currentMarkerModel.clone();
+            // Update enhanced version of background
+            Mat whiteWhiteboard = WhiteboardProcessor::whitenWhiteboard(currentFrame, currentMarkerModel);
+            oldRefinedBackground = whiteWhiteboard.clone();
+        }
+    }
+    // Update the old frame
     oldFrame = currentFrame.clone();
 }
 

@@ -918,29 +918,28 @@ Mat WhiteboardProcessor::smoothMarkerTransition(const Mat& whiteWhiteboardImage)
 
 ///////////////////////////////////////////////////////////////////
 ///
-///   Update the background (whiteboard) model
+///   Update a model (marker or whiteboard model)
 ///
 ///////////////////////////////////////////////////////////////////
 
 // Arguments:
-//    oldWboardModel: The previous image of the whiteboard
-//    newInfo: The enhanced version of the current whiteboard image, which includes the professor
-//    mvmtInfo: A binary image indicating where there was significant movement (ie. where the
-//              professor might be)
-Mat WhiteboardProcessor::updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo) {
+//    oldModel: The previous version of the model
+//    newInfo: The image containing the information to update the model with
+//    oldInfoMask: A binary image indicating (with white pixels) where the model should NOT be updated
+Mat WhiteboardProcessor::updateModel(const Mat& oldModel, const Mat& newInfo, const Mat& oldInfoMask) {
     // Throw exception if one of the given arguments has no image data
-    // Mostly useful to protect against updating a nonexistent whiteboard model
-    if(!oldWboardModel.data || !newInfo.data || !mvmtInfo.data) {
-        throw std::invalid_argument("updateBack3: Attempted to update a whiteboard model with missing data.");
+    // Mostly useful to protect against updating a nonexistent model
+    if(!oldModel.data || !newInfo.data || !oldInfoMask.data) {
+        throw std::invalid_argument("updateBack3: Attempted to update a model with missing data.");
     }
 
-    Mat updatedModel = oldWboardModel.clone();
+    Mat updatedModel = oldModel.clone();
 
     //for every pixel in the image
     for (int y = 0; y < updatedModel.rows; y++) {
         for (int x = 0; x < updatedModel.cols; x++) {
             //if there was no movement at that pixel
-            if (mvmtInfo.at<Vec3b>(y,x)[0] == 0) {
+            if (oldInfoMask.at<Vec3b>(y,x)[0] == 0) {
                 //update the whiteboard model at that pixel
                 for (int c=0;c<3;c++){
                     updatedModel.at<Vec3b>(y,x)[c]=newInfo.at<Vec3b>(y,x)[c];
@@ -952,7 +951,10 @@ Mat WhiteboardProcessor::updateWhiteboardModel(const Mat& oldWboardModel, const 
     return updatedModel;
 }
 
-// Find diffs between two marker images
+// Find the percentage of pixels that differ between the old and new marker models
+// Arguments:
+//    oldMarkerModel: A binary image indicating (in white) where the marker is in the old model
+//    newMarkerModel: A binary image indicating (in white) where the marker is in the new model
 float WhiteboardProcessor::findMarkerModelDiffs(const Mat& oldMarkerModel, const Mat& newMarkerModel) {
     float count = 0;
     for(int i = 0; i < oldMarkerModel.rows; i++) {

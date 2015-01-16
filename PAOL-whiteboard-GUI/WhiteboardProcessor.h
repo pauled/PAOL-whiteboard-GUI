@@ -25,15 +25,6 @@ public:
     static const int BORDER_DIFF_THRESHOLD = 50;
     static const int WINDOW_SIZE = 0;
 
-    /// Fields to process whiteboard
-//    int stableImageCount;
-//    Mat oldFrame;
-//    Mat whiteboardModel;
-
-    /// Fields for debugging whiteboard processing
-//    bool debugProcessing;
-//    vector<Mat> debugFrames;
-
     /// Utility methods
 
     /// Methods to find and process differences (ie. find the lecturer)
@@ -70,23 +61,12 @@ public:
     static Mat smoothMarkerTransition(const Mat& whiteWhiteboardImage);
 
     /// Update the background (whiteboard) model
-    static Mat updateWhiteboardModel(const Mat& oldWboardModel, const Mat& newInfo, const Mat& mvmtInfo);
+    static Mat updateModel(const Mat& oldModel, const Mat& newInfo, const Mat& oldInfoMask);
 
+    /// Unsorted methods
     static float findMarkerModelDiffs(const Mat& oldMarkerModel, const Mat& newMarkerModel);
     static float difference(const Mat& oldFrame, const Mat& newFrame);
 
-public:
-    /// Definitions for constructing and restoring original state
-    /// of the whiteboard processor
-//    WhiteboardProcessor();
-//    WhiteboardProcessor(bool debugFlag);
-//    void reset();
-
-    /// Method to process the given frame and update whiteboard model
-//    Mat processCurFrame(const Mat& currentFrame);
-
-    /// Method to get debugging frames
-//    vector<Mat> getDebugFrames();
 };
 
 #endif // WHITEBOARDPROCESSOR_H
