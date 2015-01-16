@@ -114,8 +114,7 @@ void MainWindow::processImage() {
         // Get a percentage for how much the marker model changed
         float saveNumDif = WhiteboardProcessor::findMarkerModelDiffs(oldMarkerModel, newMarkerModel);
         if (saveNumDif>.004){
-//            saveImageWithTimestamp(oldRefinedBackground);
-            displayMat(oldRefinedBackground, *ui->imDisplay2);
+            saveImageWithTimestamp(oldRefinedBackground);
         }
         //copy last clean whiteboard image
         oldRefinedBackground = currentWhiteboardModel.clone();
@@ -224,8 +223,7 @@ void MainWindow::displayMat(const Mat& mat, QLabel &location) {
     location.setPixmap(QPixmap::fromImage(img));
 }
 
-void MainWindow::saveWhiteboardImage(const Mat &frame, int& frameTime, int& deviceNum) {
-    char savePath[256];
-    sprintf(savePath, "/home/paol/shared/out/whiteBoard%d-%d.png", frameTime, deviceNum);
-    imwrite(savePath, frame);
+void MainWindow::saveImageWithTimestamp(const Mat &frame) {
+    // Don't actually save the image, just display what would have been saved
+    displayMat(frame, *ui->imDisplay2);
 }

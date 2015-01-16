@@ -63,7 +63,7 @@ private:
     void displayMat(const Mat& mat, QLabel &location);
 
     // Method to save images
-    void saveWhiteboardImage(const Mat& frame, int &frameTime, int &deviceNum);
+    void saveImageWithTimestamp(const Mat& frame);
 
     // Methods for processing whiteboard
     bool takePicture();
