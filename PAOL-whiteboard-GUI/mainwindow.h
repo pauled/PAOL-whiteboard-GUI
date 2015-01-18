@@ -4,7 +4,9 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QInputDialog>
-#include "WhiteboardProcessor.h"
+#include <QFileDialog>
+#include <QLabel>
+#include "PAOLProcUtils.h"
 #include "ImageScanner.h"
 #include "ImageProcessor.h"
 

@@ -18,7 +18,7 @@ SOURCES += main.cpp\
     clock.cpp \
     webcamimagescanner.cpp \
     datasetimagescanner.cpp \
-    WhiteboardProcessor.cpp
+    PAOLProcUtils.cpp
 
 HEADERS  += mainwindow.h \
     uf.h \
@@ -27,7 +27,7 @@ HEADERS  += mainwindow.h \
     webcamimagescanner.h \
     datasetimagescanner.h \
     ImageProcessor.h \
-    WhiteboardProcessor.h
+    PAOLProcUtils.h
 
 FORMS    += mainwindow.ui
 

@@ -81,7 +81,7 @@ void MainWindow::processImage() {
     //compare picture to previous picture and store differences in allDiffs
     float numDif;
     Mat allDiffs;
-    WhiteboardProcessor::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
+    PAOLProcUtils::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
 
     // If there is a large enough difference, reset the stable whiteboard image count and do further processing
     if(numDif > .01) {
@@ -90,34 +90,34 @@ void MainWindow::processImage() {
         // Find true differences (ie. difference pixels with enough differences surrounding them)
         float refinedNumDif;
         Mat filteredDiffs;
-        WhiteboardProcessor::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
+        PAOLProcUtils::filterNoisyDiffs(filteredDiffs, refinedNumDif, allDiffs);
 
         // Find if there are enough true differences to update the current marker and whiteboard models
         // (ie. professor movement or lighting change detected)
         if(refinedNumDif > .01) {
             // Identify where the motion (ie. the professor) is
-            Mat movement = WhiteboardProcessor::expandDifferencesRegion(filteredDiffs);
+            Mat movement = PAOLProcUtils::expandDifferencesRegion(filteredDiffs);
             // Rescale movement info to full size
-            Mat mvmtFullSize = WhiteboardProcessor::enlarge(movement);
+            Mat mvmtFullSize = PAOLProcUtils::enlarge(movement);
 
             // Get the marker model of the current frame
-            Mat currentMarkerWithProf = WhiteboardProcessor::findMarkerWithCC(currentFrame);
+            Mat currentMarkerWithProf = PAOLProcUtils::findMarkerWithCC(currentFrame);
             // Use the movement information to erase the professor
-            Mat currentMarkerModel = WhiteboardProcessor::updateModel(
+            Mat currentMarkerModel = PAOLProcUtils::updateModel(
                         oldMarkerModel, currentMarkerWithProf, mvmtFullSize);
 
             // Find how much the current marker model differs from the stored one
-            float markerDiffs = WhiteboardProcessor::findMarkerModelDiffs(oldMarkerModel, currentMarkerModel);
+            float markerDiffs = PAOLProcUtils::findMarkerModelDiffs(oldMarkerModel, currentMarkerModel);
             // Save and update the models if the marker content changed enough
             if(markerDiffs > .004) {
                 // Save the smooth marker version of the old background image
-                Mat oldRefinedBackgroundSmooth = WhiteboardProcessor::smoothMarkerTransition(oldRefinedBackground);
+                Mat oldRefinedBackgroundSmooth = PAOLProcUtils::smoothMarkerTransition(oldRefinedBackground);
                 saveImageWithTimestamp(oldRefinedBackgroundSmooth);
                 // Update marker model
                 oldMarkerModel = currentMarkerModel.clone();
                 // Update enhanced version of background
-                Mat whiteWhiteboard = WhiteboardProcessor::whitenWhiteboard(currentFrame, currentMarkerModel);
-                oldRefinedBackground = WhiteboardProcessor::updateModel(
+                Mat whiteWhiteboard = PAOLProcUtils::whitenWhiteboard(currentFrame, currentMarkerModel);
+                oldRefinedBackground = PAOLProcUtils::updateModel(
                             oldRefinedBackground, whiteWhiteboard, mvmtFullSize);
             }
         }
@@ -129,13 +129,13 @@ void MainWindow::processImage() {
         // can update the marker and whiteboard models without movement information
         if(stableWhiteboardCount == 3) {
             // Save the smooth marker version of the old background image
-            Mat oldRefinedBackgroundSmooth = WhiteboardProcessor::smoothMarkerTransition(oldRefinedBackground);
+            Mat oldRefinedBackgroundSmooth = PAOLProcUtils::smoothMarkerTransition(oldRefinedBackground);
             saveImageWithTimestamp(oldRefinedBackgroundSmooth);
             // Update marker model
-            Mat currentMarkerModel = WhiteboardProcessor::findMarkerWithCC(currentFrame);
+            Mat currentMarkerModel = PAOLProcUtils::findMarkerWithCC(currentFrame);
             oldMarkerModel = currentMarkerModel.clone();
             // Update enhanced version of background
-            Mat whiteWhiteboard = WhiteboardProcessor::whitenWhiteboard(currentFrame, currentMarkerModel);
+            Mat whiteWhiteboard = PAOLProcUtils::whitenWhiteboard(currentFrame, currentMarkerModel);
             oldRefinedBackground = whiteWhiteboard.clone();
         }
     }
