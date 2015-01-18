@@ -151,6 +151,7 @@ void MainWindow::on_camera_clicked()
     try {
         // Initialize scanner
         scanner = new WebcamImageScanner(promptWebcamNumber());
+        scanner->setPrintDebug(true);
 
         // Start processing whiteboard
         runCam = true;
@@ -175,6 +176,7 @@ void MainWindow::on_loadDataSet_clicked()
     try {
         // Initialize scanner
         scanner = new DatasetImageScanner(promptFirstDataSetImage());
+        scanner->setPrintDebug(true);
 
         // Start processing whiteboard
         runCam = true;

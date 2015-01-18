@@ -39,7 +39,8 @@ bool WebcamImageScanner::getNextImage(Mat& destination) {
     if(temp.data) {
         // Copy image to destination
         destination = temp.clone();
-        qDebug("Successfully took a webcam picture.");
+        if(printDebug)
+            qDebug("Successfully took a webcam picture.");
         return true;
     }
     else {

@@ -18,7 +18,8 @@ SOURCES += main.cpp\
     clock.cpp \
     webcamimagescanner.cpp \
     datasetimagescanner.cpp \
-    PAOLProcUtils.cpp
+    PAOLProcUtils.cpp \
+    imagescanner.cpp
 
 HEADERS  += mainwindow.h \
     uf.h \

@@ -54,11 +54,13 @@ bool DatasetImageScanner::getNextImage(Mat &destination) {
                 nextFrameIndex = tempFrameIndex + 1;
                 nextFrameTime = tempFrameTime + 1;
 
-                qDebug("Successfully read %s", nextFrameLoc);
+                if(printDebug)
+                    qDebug("Successfully read %s", nextFrameLoc);
                 return true;
             }
         }
     }
-    qDebug("Failed to find the next file.");
+    if(printDebug)
+        qDebug("Failed to find the next file.");
     return false;
 }
