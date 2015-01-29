@@ -676,12 +676,20 @@ Mat PAOLProcUtils::filterConnectedComponents(const Mat& compsImg, const Mat& kee
 // First, find the DoG edges and threshold them. Then, use pDrift to determine
 // which connected components from the threholded DoG edges should be kept.
 Mat PAOLProcUtils::findMarkerWithCC(const Mat& orig) {
+    Mat markerCandidates = findMarkerStrokeCandidates(orig);
+    Mat markerLocations = findMarkerStrokeLocations(orig);
+    return filterConnectedComponents(markerCandidates, markerLocations);
+}
+
+Mat PAOLProcUtils::findMarkerStrokeCandidates(const Mat& orig) {
     Mat markerCandidates = getDoGEdges(orig, 13, 17, 1);
     markerCandidates = adjustLevels(markerCandidates, 0, 4, 1);
-    markerCandidates = binarizeAnd(markerCandidates, 10);
+    return binarizeAnd(markerCandidates, 10);
+}
+
+Mat PAOLProcUtils::findMarkerStrokeLocations(const Mat& orig) {
     Mat markerLocations = pDrift(orig);
-    markerLocations = binarizeOr(markerLocations, 20);
-    return filterConnectedComponents(markerCandidates, markerLocations);
+    return binarizeOr(markerLocations, 8);
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -823,46 +831,62 @@ Mat PAOLProcUtils::whitenWhiteboard(const Mat& whiteboardImg, const Mat& markerP
 
 // Skew the given image so the whiteboard region is rectangular
 // TODO: Modify this method so it takes in a structure of corner coordinates
-Mat PAOLProcUtils::rectifyImage(const Mat& whiteboardImg){
-    Mat ret = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
-    double widthP,heightP;
-    double LTx,LTy,LBx,LBy,RTx,RTy,RBx,RBy;//L left R right T top B bottom
-    LTx=354;
-    LTy=236;
-    LBx=444;
-    LBy=706;
-    RTx=1915;
-    RTy=260;
-    RBx=1825;
-    RBy=727;
-    int xInput,yInput;
-    double LPx,LPy,RPx,RPy;//end points of line between edges on which point is found
+Mat PAOLProcUtils::rectifyImage(const Mat& whiteboardImg, const WBCorners& corners){
+//    Mat ret = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
+//    double widthP,heightP;
+//    double LTx,LTy,LBx,LBy,RTx,RTy,RBx,RBy;//L left R right T top B bottom
+//    LTx=354;
+//    LTy=236;
+//    LBx=444;
+//    LBy=706;
+//    RTx=1915;
+//    RTy=260;
+//    RBx=1825;
+//    RBy=727;
+//    int xInput,yInput;
+//    double LPx,LPy,RPx,RPy;//end points of line between edges on which point is found
 
-    for(int x = 0; x < ret.cols; x++)
-        for(int y = 0; y < ret.rows; y++){
-            widthP=(double)x/(double)ret.cols;
-            heightP=(double)y/(double)ret.rows;
-            LPx=LTx+(LBx-LTx)*heightP;
-            LPy=LTy+(LBy-LTy)*heightP;
-            RPx=RTx+(RBx-RTx)*heightP;
-            RPy=RTy+(RBy-RTy)*heightP;
+//    for(int x = 0; x < ret.cols; x++)
+//        for(int y = 0; y < ret.rows; y++){
+//            widthP=(double)x/(double)ret.cols;
+//            heightP=(double)y/(double)ret.rows;
+//            LPx=LTx+(LBx-LTx)*heightP;
+//            LPy=LTy+(LBy-LTy)*heightP;
+//            RPx=RTx+(RBx-RTx)*heightP;
+//            RPy=RTy+(RBy-RTy)*heightP;
 
-            xInput=(int)(LPx+(RPx-LPx)*widthP);
-            yInput=(int)(LPy+(RPy-LPy)*widthP);
+//            xInput=(int)(LPx+(RPx-LPx)*widthP);
+//            yInput=(int)(LPy+(RPy-LPy)*widthP);
 
-            if (xInput >= 0 &&
-                    xInput < whiteboardImg.cols &&
-                    yInput >= 0 &&
-                    yInput < whiteboardImg.rows){
-                ret.at<Vec3b>(y,x)[0] = whiteboardImg.at<Vec3b>(yInput,xInput)[0];
-                ret.at<Vec3b>(y,x)[1] = whiteboardImg.at<Vec3b>(yInput,xInput)[1];
-                ret.at<Vec3b>(y,x)[2] = whiteboardImg.at<Vec3b>(yInput,xInput)[2];
-            } else {
-                ret.at<Vec3b>(y,x)[0]=0;
-                ret.at<Vec3b>(y,x)[1]=0;
-                ret.at<Vec3b>(y,x)[2]=0;
-            }
-        }
+//            if (xInput >= 0 &&
+//                    xInput < whiteboardImg.cols &&
+//                    yInput >= 0 &&
+//                    yInput < whiteboardImg.rows){
+//                ret.at<Vec3b>(y,x)[0] = whiteboardImg.at<Vec3b>(yInput,xInput)[0];
+//                ret.at<Vec3b>(y,x)[1] = whiteboardImg.at<Vec3b>(yInput,xInput)[1];
+//                ret.at<Vec3b>(y,x)[2] = whiteboardImg.at<Vec3b>(yInput,xInput)[2];
+//            } else {
+//                ret.at<Vec3b>(y,x)[0]=0;
+//                ret.at<Vec3b>(y,x)[1]=0;
+//                ret.at<Vec3b>(y,x)[2]=0;
+//            }
+//        }
+//    return ret;
+    vector<Point2f> cornersInImage;
+    cornersInImage.push_back(Point2f(corners.TLx, corners.TLy));
+    cornersInImage.push_back(Point2f(corners.TRx, corners.TRy));
+    cornersInImage.push_back(Point2f(corners.BRx, corners.BRy));
+    cornersInImage.push_back(Point2f(corners.BLx, corners.BLy));
+
+    vector<Point2f> finalCorners;
+    finalCorners.push_back(Point2f(0, 0));
+    finalCorners.push_back(Point2f(whiteboardImg.cols, 0));
+    finalCorners.push_back(Point2f(whiteboardImg.cols, whiteboardImg.rows));
+    finalCorners.push_back(Point2f(0, whiteboardImg.rows));
+
+    Mat transform = getPerspectiveTransform(cornersInImage, finalCorners);
+    Mat ret;
+    warpPerspective(whiteboardImg, ret, transform, whiteboardImg.size());
     return ret;
 }
 

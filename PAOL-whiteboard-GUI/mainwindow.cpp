@@ -35,6 +35,16 @@ MainWindow::MainWindow(QWidget *parent) :
     saveImageCount = 0;
     capturedImageCount = 0;
 
+    // Set up whiteboard corners
+    corners.TLx = 105;
+    corners.TLy = 511;
+    corners.TRx = 1021;
+    corners.TRy = 539;
+    corners.BLx = 146;
+    corners.BLy = 910;
+    corners.BRx = 999;
+    corners.BRy = 916;
+
     // Set timer
     qTimer = new QTimer(this);
     connect(qTimer, SIGNAL(timeout()), this, SLOT(workOnNextImage()));
@@ -78,10 +88,14 @@ void MainWindow::processImage() {
         return;
     }
 
+    // Get rectified versions of old and current frames
+    Mat oldRectified = PAOLProcUtils::rectifyImage(oldFrame, corners);
+    Mat currentRectified = PAOLProcUtils::rectifyImage(currentFrame, corners);
+
     //compare picture to previous picture and store differences in allDiffs
     float numDif;
     Mat allDiffs;
-    PAOLProcUtils::findAllDiffsMini(allDiffs, numDif, oldFrame, currentFrame, 40, 1);
+    PAOLProcUtils::findAllDiffsMini(allDiffs, numDif, oldRectified, currentRectified, 40, 1);
 
     // If there is a large enough difference, reset the stable whiteboard image count and do further processing
     if(numDif > .01) {
@@ -100,25 +114,34 @@ void MainWindow::processImage() {
             // Rescale movement info to full size
             Mat mvmtFullSize = PAOLProcUtils::enlarge(movement);
 
-            // Get the marker model of the current frame
-            Mat currentMarkerWithProf = PAOLProcUtils::findMarkerWithCC(currentFrame);
+            // Find marker candidates
+            Mat markerCandidates = PAOLProcUtils::findMarkerStrokeCandidates(currentRectified);
+            // Find marker locations
+            Mat markerLocations = PAOLProcUtils::findMarkerStrokeLocations(currentRectified);
+            // Keep marker candidates intersecting with marker locations
+            Mat currentMarkerWithProf = PAOLProcUtils::filterConnectedComponents(markerCandidates, markerLocations);
+
             // Use the movement information to erase the professor
             Mat currentMarkerModel = PAOLProcUtils::updateModel(
                         oldMarkerModel, currentMarkerWithProf, mvmtFullSize);
 
             // Find how much the current marker model differs from the stored one
             float markerDiffs = PAOLProcUtils::findMarkerModelDiffs(oldMarkerModel, currentMarkerModel);
+            qDebug("numDif: %f", numDif);
+            qDebug("refinedNumDif: %f", refinedNumDif);
+            qDebug("markerDiffs: %f", markerDiffs);
             // Save and update the models if the marker content changed enough
-            if(markerDiffs > .004) {
+            if(markerDiffs > .022) {
                 // Save the smooth marker version of the old background image
                 Mat oldRefinedBackgroundSmooth = PAOLProcUtils::smoothMarkerTransition(oldRefinedBackground);
                 saveImageWithTimestamp(oldRefinedBackgroundSmooth);
                 // Update marker model
                 oldMarkerModel = currentMarkerModel.clone();
                 // Update enhanced version of background
-                Mat whiteWhiteboard = PAOLProcUtils::whitenWhiteboard(currentFrame, currentMarkerModel);
+                Mat whiteWhiteboard = PAOLProcUtils::whitenWhiteboard(currentRectified, currentMarkerModel);
                 oldRefinedBackground = PAOLProcUtils::updateModel(
                             oldRefinedBackground, whiteWhiteboard, mvmtFullSize);
+                displayMat(oldRefinedBackground, *ui->imDisplay2);
             }
         }
     }
@@ -131,12 +154,20 @@ void MainWindow::processImage() {
             // Save the smooth marker version of the old background image
             Mat oldRefinedBackgroundSmooth = PAOLProcUtils::smoothMarkerTransition(oldRefinedBackground);
             saveImageWithTimestamp(oldRefinedBackgroundSmooth);
+
             // Update marker model
-            Mat currentMarkerModel = PAOLProcUtils::findMarkerWithCC(currentFrame);
+            // Find marker candidates
+            Mat markerCandidates = PAOLProcUtils::findMarkerStrokeCandidates(currentRectified);
+            // Find marker locations
+            Mat markerLocations = PAOLProcUtils::findMarkerStrokeLocations(currentRectified);
+            // Keep marker candidates intersecting with marker locations
+            Mat currentMarkerModel = PAOLProcUtils::filterConnectedComponents(markerCandidates, markerLocations);
+
             oldMarkerModel = currentMarkerModel.clone();
             // Update enhanced version of background
-            Mat whiteWhiteboard = PAOLProcUtils::whitenWhiteboard(currentFrame, currentMarkerModel);
+            Mat whiteWhiteboard = PAOLProcUtils::whitenWhiteboard(currentRectified, currentMarkerModel);
             oldRefinedBackground = whiteWhiteboard.clone();
+            displayMat(oldRefinedBackground, *ui->imDisplay2);
         }
     }
 }

@@ -55,6 +55,7 @@ private:
     Mat oldMarkerModel;
     Mat oldRefinedBackground; // What the whiteboard from the oldFrame looks like
     int stableWhiteboardCount;
+    WBCorners corners;
 
     // Methods to request user input
     string promptFirstDataSetImage();
