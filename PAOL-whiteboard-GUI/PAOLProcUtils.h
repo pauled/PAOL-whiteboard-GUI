@@ -10,8 +10,7 @@ using namespace cv;
 
 typedef struct wbc WBCorners;
 struct wbc {
-    int TLx, TLy, TRx, TRy;
-    int BLx, BLy, BRx, BRy;
+    Point2f TL, TR, BL, BR;
 };
 
 class PAOLProcUtils
@@ -75,6 +74,8 @@ public:
     /// Method to find differences between computer images
     static float getVGADifferences(const Mat& oldFrame, const Mat& newFrame);
 
+    /// Method to sort whiteboard corners into TL, TR, BR, BL
+    static void sortCorners(WBCorners& corners);
 };
 
 #endif // PAOLPROCUTILS_H

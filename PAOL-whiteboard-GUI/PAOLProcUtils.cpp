@@ -830,61 +830,24 @@ Mat PAOLProcUtils::whitenWhiteboard(const Mat& whiteboardImg, const Mat& markerP
 }
 
 // Skew the given image so the whiteboard region is rectangular
-// TODO: Modify this method so it takes in a structure of corner coordinates
 Mat PAOLProcUtils::rectifyImage(const Mat& whiteboardImg, const WBCorners& corners){
-//    Mat ret = Mat::zeros(whiteboardImg.size(), whiteboardImg.type());
-//    double widthP,heightP;
-//    double LTx,LTy,LBx,LBy,RTx,RTy,RBx,RBy;//L left R right T top B bottom
-//    LTx=354;
-//    LTy=236;
-//    LBx=444;
-//    LBy=706;
-//    RTx=1915;
-//    RTy=260;
-//    RBx=1825;
-//    RBy=727;
-//    int xInput,yInput;
-//    double LPx,LPy,RPx,RPy;//end points of line between edges on which point is found
-
-//    for(int x = 0; x < ret.cols; x++)
-//        for(int y = 0; y < ret.rows; y++){
-//            widthP=(double)x/(double)ret.cols;
-//            heightP=(double)y/(double)ret.rows;
-//            LPx=LTx+(LBx-LTx)*heightP;
-//            LPy=LTy+(LBy-LTy)*heightP;
-//            RPx=RTx+(RBx-RTx)*heightP;
-//            RPy=RTy+(RBy-RTy)*heightP;
-
-//            xInput=(int)(LPx+(RPx-LPx)*widthP);
-//            yInput=(int)(LPy+(RPy-LPy)*widthP);
-
-//            if (xInput >= 0 &&
-//                    xInput < whiteboardImg.cols &&
-//                    yInput >= 0 &&
-//                    yInput < whiteboardImg.rows){
-//                ret.at<Vec3b>(y,x)[0] = whiteboardImg.at<Vec3b>(yInput,xInput)[0];
-//                ret.at<Vec3b>(y,x)[1] = whiteboardImg.at<Vec3b>(yInput,xInput)[1];
-//                ret.at<Vec3b>(y,x)[2] = whiteboardImg.at<Vec3b>(yInput,xInput)[2];
-//            } else {
-//                ret.at<Vec3b>(y,x)[0]=0;
-//                ret.at<Vec3b>(y,x)[1]=0;
-//                ret.at<Vec3b>(y,x)[2]=0;
-//            }
-//        }
-//    return ret;
+    // Set where the whiteboard corners are in the image
     vector<Point2f> cornersInImage;
-    cornersInImage.push_back(Point2f(corners.TLx, corners.TLy));
-    cornersInImage.push_back(Point2f(corners.TRx, corners.TRy));
-    cornersInImage.push_back(Point2f(corners.BRx, corners.BRy));
-    cornersInImage.push_back(Point2f(corners.BLx, corners.BLy));
+    cornersInImage.push_back(corners.TL);
+    cornersInImage.push_back(corners.TR);
+    cornersInImage.push_back(corners.BR);
+    cornersInImage.push_back(corners.BL);
 
+    // Set where the whiteboard corners should end up in the image (ie. the corners of the whole image)
     vector<Point2f> finalCorners;
     finalCorners.push_back(Point2f(0, 0));
     finalCorners.push_back(Point2f(whiteboardImg.cols, 0));
     finalCorners.push_back(Point2f(whiteboardImg.cols, whiteboardImg.rows));
     finalCorners.push_back(Point2f(0, whiteboardImg.rows));
 
+    // Get the transform matrix
     Mat transform = getPerspectiveTransform(cornersInImage, finalCorners);
+    // Do the perspective correction
     Mat ret;
     warpPerspective(whiteboardImg, ret, transform, whiteboardImg.size());
     return ret;
@@ -1084,4 +1047,34 @@ float PAOLProcUtils::getVGADifferences(const Mat& oldFrame, const Mat& newFrame)
         return 0;
     else
         return numDiff / (oldFrame.rows*oldFrame.cols);
+}
+
+// Sort the given whiteboard corners, assuming that corners.TL might not be the top-left corner, or corners.BR
+// might not be the bottom-left corner, etc. Implementation based on the OpenCV tutorial
+// http://opencv-code.com/tutorials/automatic-perspective-correction-for-quadrilateral-objects/
+void PAOLProcUtils::sortCorners(WBCorners &corners) {
+    // Store the corners as a vector
+    vector<Point2f> allCorners;
+    allCorners.push_back(corners.TL);
+    allCorners.push_back(corners.TR);
+    allCorners.push_back(corners.BL);
+    allCorners.push_back(corners.BR);
+
+    // Get center of mass of the corners (average of the four coordinates)
+    Point2f center = .25 * (corners.TL + corners.TR + corners.BL + corners.BR);
+
+    // Get the two top and two bottom points
+    vector<Point2f> topPoints, bottomPoints;
+    for(int i = 0; i < allCorners.size(); i++) {
+        // Put the corners above the center in topPoints, put the rest in bottomPoints
+        if(allCorners[i].y < center.y)
+            topPoints.push_back(allCorners[i]);
+        else
+            bottomPoints.push_back(allCorners[i]);
+    }
+
+    corners.TL = (topPoints[0].x > topPoints[1].x) ? topPoints[1] : topPoints[0];
+    corners.TR = (topPoints[0].x > topPoints[1].x) ? topPoints[0] : topPoints[1];
+    corners.BL = (bottomPoints[0].x > bottomPoints[1].x) ? bottomPoints[1] : bottomPoints[0];
+    corners.BR = (bottomPoints[0].x > bottomPoints[1].x) ? bottomPoints[0] : bottomPoints[1];
 }

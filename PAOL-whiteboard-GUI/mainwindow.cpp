@@ -36,14 +36,11 @@ MainWindow::MainWindow(QWidget *parent) :
     capturedImageCount = 0;
 
     // Set up whiteboard corners
-    corners.TLx = 105;
-    corners.TLy = 511;
-    corners.TRx = 1021;
-    corners.TRy = 539;
-    corners.BLx = 146;
-    corners.BLy = 910;
-    corners.BRx = 999;
-    corners.BRy = 916;
+    corners.TL = Point2f(105, 511);
+    corners.TR = Point2f(1021, 539);
+    corners.BR = Point2f(999, 916);
+    corners.BL = Point2f(146, 910);
+    PAOLProcUtils::sortCorners(corners);
 
     // Set timer
     qTimer = new QTimer(this);
