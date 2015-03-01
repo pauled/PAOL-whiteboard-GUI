@@ -41,7 +41,7 @@ bool DatasetImageScanner::getNextImage(Mat &destination) {
             int tempFrameTime = nextFrameTime + timeSkipCount;
 
             // Attempt to read the file with the temp frame index and time
-            sprintf(nextFrameLoc, "%s/cameraIn%06d-%10d-%d.png",
+            sprintf(nextFrameLoc, "%s/cameraIn%06d-%010d-%d.png",
                     datasetPath.c_str(), tempFrameIndex, tempFrameTime, datasetCamNum);
             temp = imread(nextFrameLoc, CV_LOAD_IMAGE_COLOR);
 
